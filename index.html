@@ -208,13 +208,9 @@ body{padding:0 0 90px}
 .fb-champ-lbl{font-size:9px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
 .fb-center .fb-match{width:56px;border-color:rgba(251,191,36,0.45)}
 
-/* ---------- full-screen pickable bracket (View all) ---------- */
-.pkall{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column;animation:fbfade .15s ease}
-.pkall-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)}
-.pkall-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
-.pkall-body .bracket-scroll{flex:1;display:flex;align-items:center;width:100%}
-.pkall-body .bracket{margin:auto}
-.pkall-foot{border-top:1px solid var(--border);padding-bottom:6px}
+/* ---------- view-all toggle (mobile: drop round tabs, show full bracket) ---------- */
+.viewall-bar{display:flex;align-items:center;gap:10px;padding:8px 14px 2px}
+.viewall-hint{font-size:11px;color:var(--muted);letter-spacing:0.3px}
 .mtab-all{border-color:var(--accent)!important;color:var(--accent)!important;flex:0 0 auto!important;min-width:50px!important}
 .lbview{flex:none;font-size:15px;opacity:.55;padding-left:2px}
 
@@ -247,9 +243,8 @@ body{padding:0 0 90px}
 </div>
 
 <div id="bracketChrome">
-  <div class="toolbar">
+  <div class="toolbar" id="bracketTools">
     <button class="btn primary" id="revealBtn" disabled>🔓 Reveal &amp; Score</button>
-    <button class="btn ghost" onclick="showPickAll()">⤢ View all</button>
     <button class="btn ghost" id="resetBtn">↺ Reset</button>
     <span class="scorechip" id="scoreChip">0/15 picked</span>
   </div>
@@ -402,7 +397,7 @@ let revealed = false;
 let mobileRound = 1;
 let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
-let pickAllOpen = false;
+let mobileViewAll = false;
 let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
@@ -538,25 +533,28 @@ function mobileBracketHTML(slots){
     const n=i+1, total=R.positions.length, done=roundPicked(R)===total;
     const badge = revealed ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
     return `<button class="mtab ${n===mobileRound?'on':''} ${done?'complete':''}" onclick="goRound(${n})">${R.short}<span class="badge">${badge}</span></button>`;
-  }).join('') + `<button class="mtab mtab-all" onclick="showPickAll()">&#10530;<span class="badge">all</span></button>`;
+  }).join('') + `<button class="mtab mtab-all" onclick="toggleViewAll()">&#10530;<span class="badge">all</span></button>`;
   const R = ROUNDS[mobileRound-1];
   const games = R.positions.map(p=>matchCard(p,slots)).join('');
   let nav = '';
-  if(mobileRound<4){
-    const done = roundPicked(R)===R.positions.length;
-    nav += `<button class="nextbtn ${done&&!revealed?'ready':''}" onclick="goRound(${mobileRound+1})">Next: ${ROUNDS[mobileRound].title} →</button>`;
+  if(!isSubmittedNow()){
+    if(mobileRound<4){
+      const done = roundPicked(R)===R.positions.length;
+      nav += `<button class="nextbtn ${done&&!revealed?'ready':''}" onclick="goRound(${mobileRound+1})">Next: ${ROUNDS[mobileRound].title} →</button>`;
+    }
+    if(mobileRound>1) nav += `<div class="prevlink" onclick="goRound(${mobileRound-1})">← ${ROUNDS[mobileRound-2].title}</div>`;
   }
-  if(mobileRound>1) nav += `<div class="prevlink" onclick="goRound(${mobileRound-1})">← ${ROUNDS[mobileRound-2].title}</div>`;
   return `<div class="mtabs">${tabs}</div>
     <div class="mround"><div class="round-head">${R.title}<span class="cnt">${R.sub}</span></div>
     ${mobileRound===4?CUP:''}<div class="mgames">${games}</div>${nav}</div>`;
 }
 
 /* ---------- submit bar ---------- */
+function isSubmittedNow(){ const e = myEntry(); return !!(e && JSON.stringify(e.picks)===JSON.stringify(picks)); }
 function submitBarHTML(){
   const made = picksMade();
   const entry = myEntry();
-  const isSubmitted = entry && JSON.stringify(entry.picks)===JSON.stringify(picks);
+  const isSubmitted = isSubmittedNow();
   let btn, note;
   if(isSubmitted){
     btn = `<button class="btn big" onclick="go('leaderboard')">✓ Submitted — view leaderboard →</button>`;
@@ -575,7 +573,9 @@ function submitBarHTML(){
 function renderBracketView(){
   const slots = buildSlots();
   savePicks();
-  const inner = isMobile ? mobileBracketHTML(slots) : desktopBracketHTML(slots);
+  const inner = (isMobile && !mobileViewAll) ? mobileBracketHTML(slots)
+              : isMobile ? mobileAllHTML(slots)
+              : desktopBracketHTML(slots);
   document.getElementById('mount').innerHTML = pickFilterBarHTML() + inner + submitBarHTML();
   renderChampBanner(slots);
   renderChrome();
@@ -700,26 +700,10 @@ function renderBracketOverlay(){
 function openMyBracket(){ showBracketOverlay(Object.assign({}, picks), 'Your Bracket', picksMade()>0 ? 'picks' : 'results'); }
 function viewEntry(i){ const e = _lbScored[i]; if(e) showBracketOverlay(e.picks, e.name + "'s Bracket", 'picks'); }
 
-/* ---------- full-screen pickable bracket (View all) ---------- */
-function showPickAll(){ pickAllOpen = true; render(); }
-function closePickAll(){ pickAllOpen = false; const o = document.getElementById('pkall'); if(o) o.remove(); }
-function renderPickAll(){
-  let o = document.getElementById('pkall');
-  if(!pickAllOpen){ if(o) o.remove(); return; }
-  if(!o){ o = document.createElement('div'); o.id = 'pkall'; o.className = 'pkall'; document.body.appendChild(o); }
-  const slots = buildSlots();
-  const made = picksMade();
-  const chip = revealed
-    ? `<span class="scorechip good"><b>${correctCount()}</b>/15 correct</span>`
-    : `<span class="scorechip"><b>${made}</b>/15 picked</span>`;
-  o.innerHTML =
-    `<div class="pkall-head">
-       <button class="fbov-close" onclick="closePickAll()">&#10005;</button>
-       <div class="fbov-title">Full Bracket${revealed?' · Results':' · tap to pick'}</div>
-       ${chip}
-     </div>
-     <div class="pkall-body">${pickFilterBarHTML()}${desktopBracketHTML(slots)}</div>
-     <div class="pkall-foot">${submitBarHTML()}</div>`;
+/* ---------- view-all toggle (inline; mobile drops the round tabs for the full bracket) ---------- */
+function toggleViewAll(){ mobileViewAll = !mobileViewAll; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function mobileAllHTML(slots){
+  return `<div class="viewall-bar"><button class="btn ghost" onclick="toggleViewAll()">&#8862; Round-by-round</button><span class="viewall-hint">full bracket · scroll &rarr;</span></div>${desktopBracketHTML(slots)}`;
 }
 
 /* ---------- groups (create / join / switch / share) ---------- */
@@ -883,6 +867,16 @@ function renderChampBanner(slots){
 }
 
 function renderChrome(){
+  // once your bracket is submitted, hide the editing chrome (locked-in feel)
+  const submitted = isSubmittedNow();
+  const tools = document.getElementById('bracketTools');
+  if(tools) tools.style.display = submitted ? 'none' : '';
+  if(submitted){
+    document.getElementById('hint').style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    return;
+  }
+  document.getElementById('hint').style.display = '';
   const made = picksMade();
   const chip = document.getElementById('scoreChip');
   const revealBtn = document.getElementById('revealBtn');
@@ -937,11 +931,10 @@ function render(){
     renderLeaderboard();
   }
   syncAppbarH();
-  renderPickAll();
 }
 
 /* ---------- actions ---------- */
-function go(view){ pickAllOpen = false; currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function go(view){ currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function goRound(n){ mobileRound = Math.max(1,Math.min(4,n)); render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function setName(){
   const n = prompt("Your name for the pool:", playerName || "");
@@ -952,6 +945,7 @@ async function submitMine(){
   if(!playerName){ setName(); if(!playerName) return; }
   await Backend.submit({ name:playerName, picks:{...picks}, submittedAt:Date.now() });
   poolCache = await Backend.getAll();
+  revealed = false;
   go('leaderboard');
 }
 
