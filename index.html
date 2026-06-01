@@ -133,6 +133,20 @@ body{padding:0 0 90px}
 .bph-sep{color:var(--muted)}
 .boxpanel .lg-bars{margin-top:9px}
 .boxpanel .lg-goals{margin-top:9px}
+/* NHL draft chip + panel */
+.nhlchip{flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:9px;letter-spacing:0.5px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:2px 5px;margin-left:2px;cursor:pointer}
+.nhlchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.nhlwrap{border-top:1px solid var(--border);background:var(--bg);padding:8px 10px}
+.nhl-team-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+.nhlpanel .boxpanel-msg{text-align:center;color:var(--muted);font-size:12px;padding:6px}
+.nhl-sec{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin:7px 0 4px}
+.nhlrow{display:flex;align-items:center;gap:7px;padding:3px 0}
+.nhl-em{flex:none;font-size:12px}
+.nhl-nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nhl-pos{flex:none;font-size:9px;color:var(--muted);font-weight:700}
+.nhl-tag{flex:none;margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.2px;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.nhl-tag.draft{background:rgba(34,197,94,0.15);color:var(--win);border:1px solid rgba(34,197,94,0.3)}
+.nhl-tag.prospect{background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3)}
 
 /* ---------- mobile round pager ---------- */
 .mtabs{position:sticky;top:var(--appbar-h);z-index:20;display:flex;gap:6px;padding:8px 12px 10px;margin:0;background:linear-gradient(180deg,var(--bg) 78%,rgba(11,15,23,0));overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -479,6 +493,9 @@ let liveGames = [];            // scoreboard game objects (tournament only)
 let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore ('loading'|null|obj)
 let liveLoading = false;
 let expandedGames = {};        // bracket pos -> inline box score expanded?
+let expandedTeams = {};        // "pos:seo" -> NHL draft/prospect panel expanded?
+let nhlDraft = null;           // { drafted:[{fn,ln,nhl,yr,rd,pk,pos}], prospects:[{fn,ln,rank,pos,cat}] } | 'loading'
+let teamRosters = {};          // seoname -> [{first,last,pos,num}] from boxscores
 let GAME_IDS = {101:6538217, 102:6538218, 103:6538219, 104:6538220, 105:6538221, 106:6538222, 107:6538223, 108:6538224, 201:6538225, 202:6538226, 203:6538227, 204:6538228, 301:6538229, 302:6538230, 401:6538231};
 
 /* Rebuild the results/teams/game-id lookups from a bracket dataset (embedded or live). */
@@ -639,6 +656,64 @@ async function ensureBox(pos){
   liveBox[gid] = boxStats(b);   // object on success, null if unavailable
   render();
 }
+/* ---------- NHL draft / prospects per team ---------- */
+function normName(s){
+  return String(s||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+}
+async function ensureNhlDraft(){
+  if(nhlDraft && nhlDraft!=='loading') return;
+  if(nhlDraft==='loading' || !REMOTE) return;
+  nhlDraft = 'loading';
+  try {
+    const r = await fetch(`${APPS_SCRIPT}?action=nhlDraft`, {cache:"no-store"});
+    const d = await r.json();
+    nhlDraft = (d && d.ok) ? d : null;
+  } catch(e){ nhlDraft = null; }
+}
+let _draftIdx = null;
+function draftIndex(){
+  if(_draftIdx && _draftIdx._for===nhlDraft) return _draftIdx;
+  const drafted = {}, prospects = {};
+  if(nhlDraft && nhlDraft.drafted) nhlDraft.drafted.forEach(p=>{ drafted[normName(p.fn+' '+p.ln)] = p; });
+  if(nhlDraft && nhlDraft.prospects) nhlDraft.prospects.forEach(p=>{ const k=normName(p.fn+' '+p.ln); if(!prospects[k]||p.rank<prospects[k].rank) prospects[k]=p; });
+  _draftIdx = { drafted, prospects, _for:nhlDraft };
+  return _draftIdx;
+}
+function teamNhl(seo){
+  const roster = teamRosters[seo]; if(!roster) return null;
+  const idx = draftIndex();
+  const drafted = [], prospects = [];
+  roster.forEach(pl=>{
+    const k = normName(pl.first+' '+pl.last);
+    if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.drafted[k] });
+    else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.prospects[k] });
+  });
+  drafted.sort((a,b)=> a.yr-b.yr || a.pk-b.pk);
+  prospects.sort((a,b)=> a.rank-b.rank);
+  return { drafted, prospects, rosterKnown:true };
+}
+function toggleTeamNhl(pos, seo){
+  const key = pos+':'+seo;
+  expandedTeams[key] = !expandedTeams[key];
+  if(expandedTeams[key]){ ensureNhlDraft().then(render); if(!teamRosters[seo]) ensureBox(pos); }
+  render();
+}
+function teamNhlPanelHTML(pos, seo){
+  if(nhlDraft==='loading' || nhlDraft===null && REMOTE && !teamRosters[seo]) {}
+  if(nhlDraft==='loading') return `<div class="nhlpanel"><div class="boxpanel-msg">Loading NHL draft data…</div></div>`;
+  if(!nhlDraft) return `<div class="nhlpanel"><div class="boxpanel-msg">NHL draft data unavailable.</div></div>`;
+  if(!teamRosters[seo]) return `<div class="nhlpanel"><div class="boxpanel-msg">Loading roster…</div></div>`;
+  const r = teamNhl(seo);
+  if(!r || (!r.drafted.length && !r.prospects.length))
+    return `<div class="nhlpanel"><div class="boxpanel-msg">No drafted players or top-64 prospects on this roster.</div></div>`;
+  const dr = r.drafted.map(p=>`<div class="nhlrow"><span class="nhl-em">🏒</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></div>`).join('');
+  const pr = r.prospects.map(p=>`<div class="nhlrow"><span class="nhl-em">📋</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
+  return `<div class="nhlpanel">
+    ${dr ? `<div class="nhl-sec">NHL drafted</div>${dr}` : ''}
+    ${pr ? `<div class="nhl-sec">${nhlDraft.prospectYear} draft-eligible (top 64)</div>${pr}` : ''}
+  </div>`;
+}
+
 function boxCardHTML(pos){
   const gid = GAME_IDS[pos];
   const stats = gid ? liveBox[gid] : undefined;
@@ -682,7 +757,23 @@ function teamRow(team, pos, ready){
       pills = `<span class="ppills">${shown}${extra}</span>`;
     }
   }
-  return `<div class="team-row ${cls} ${clickable}" ${onclick}${rowStyle}>${seed}${img}<span class="nm">${team.nameShort}</span>${pills}<span class="mark">${mark}</span><span class="sc"></span></div>`;
+  return `<div class="team-row ${cls} ${clickable}" ${onclick}${rowStyle}>${seed}${img}<span class="nm">${team.nameShort}</span>${pills}${nhlChip(pos,team.seoname)}<span class="mark">${mark}</span><span class="sc"></span></div>`;
+}
+// small tappable "NHL" affordance on a team row (stops the pick click)
+function nhlChip(pos, seo){
+  if(!seo) return '';
+  const on = !!expandedTeams[pos+':'+seo];
+  return `<span class="nhlchip ${on?'on':''}" onclick="event.stopPropagation();toggleTeamNhl(${pos},'${seo}')" title="NHL draft picks & prospects">NHL</span>`;
+}
+// panels for any expanded teams in this game (rendered below the rows)
+function nhlPanelsFor(pos, slot){
+  let out = '';
+  [slot.Top, slot.Bottom].forEach(t=>{
+    if(t && t.seoname && expandedTeams[pos+':'+t.seoname]){
+      out += `<div class="nhlwrap"><div class="nhl-team-name">${t.nameShort} · NHL</div>${teamNhlPanelHTML(pos, t.seoname)}</div>`;
+    }
+  });
+  return out;
 }
 function matchCard(pos, slots){
   const slot = slots[pos];
@@ -694,6 +785,7 @@ function matchCard(pos, slots){
   return `<div class="match ${pos===401?'final-game':''}">
     <div class="mhead"><span>${d}</span><span>${status}</span></div>
     ${teamRow(slot.Top, pos, ready)}${teamRow(slot.Bottom, pos, ready)}
+    ${nhlPanelsFor(pos, slot)}
   </div>`;
 }
 // your bracket vs the real outcome for a finished game
@@ -725,7 +817,7 @@ function scoredMatchCard(pos, slot){
     const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
     const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
     const sc = sameMatchup ? `<span class="sc">${scoreFor(team.seoname)}</span>` : '<span class="sc"></span>';
-    return `<div class="team-row ${cls}">${seed}${img}<span class="nm">${team.nameShort}</span><span class="mark">${mark}</span>${sc}</div>`;
+    return `<div class="team-row ${cls}">${seed}${img}<span class="nm">${team.nameShort}</span>${nhlChip(pos,team.seoname)}<span class="mark">${mark}</span>${sc}</div>`;
   }
   let rows = predRow(top) + predRow(bot);
   if(!sameMatchup && aw){   // the team that actually advanced isn't in your predicted matchup — show it
@@ -741,6 +833,7 @@ function scoredMatchCard(pos, slot){
   return `<div class="match scored ${pos===401?'final-game':''}">
     <div class="mhead"><span>${d}</span><span>${status}</span></div>
     ${rows}
+    ${nhlPanelsFor(pos, slot)}
     ${toggle}
     ${open ? boxCardHTML(pos) : ''}
   </div>`;
@@ -1089,6 +1182,10 @@ function boxStats(box){
   const out = {};
   box.teamBoxscore.forEach(tb=>{
     const t = meta[String(tb.teamId)]; if(!t) return;
+    // stash the roster (names) so the NHL-draft panel can match against it
+    if(t.seoname && tb.playerStats && tb.playerStats.length){
+      teamRosters[t.seoname] = tb.playerStats.map(p=>({first:p.firstName, last:p.lastName, pos:p.position, num:p.number}));
+    }
     const s = tb.teamStats||{};
     out[t.seoname] = {
       color:t.color, sog:num(s.shots), ppg:num(s.powerPlayGoals), ppo:num(s.powerPlayOpportunities),
