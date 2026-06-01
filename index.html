@@ -13,7 +13,8 @@
   --text:#eef2fb; --muted:#8a95ad; --accent:#3b82f6; --win:#22c55e;
   --gold:#fbbf24; --loss:#5b6680; --red:#ef4444; --appbar-h:120px;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{display:none;width:0;height:0}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif}
 body{padding:0 0 90px}
 
@@ -108,6 +109,15 @@ body{padding:0 0 90px}
 .team-row.wrong .mark{color:var(--red)}
 .team-row.actualwin .sc{color:var(--gold)}
 .team-row.actualwin .mark{color:var(--gold)}
+.team-row.struck .nm{text-decoration:line-through;opacity:.55}
+.match.scored .team-row{cursor:default}
+.actual-strip{display:flex;align-items:center;gap:5px;padding:6px 9px;background:linear-gradient(90deg,rgba(251,191,36,0.12),transparent);border-top:1px solid var(--border)}
+.actual-strip img{width:18px;height:18px;object-fit:contain;flex:none}
+.as-arrow{color:var(--gold);font-size:13px;flex:none}
+.as-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.as-tag{font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold);font-weight:700;flex:none}
+.as-sc{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--muted);flex:none}
+.editlink{color:var(--accent);cursor:pointer;text-decoration:underline;font-weight:700}
 
 /* ---------- mobile round pager ---------- */
 .mtabs{position:sticky;top:var(--appbar-h);z-index:20;display:flex;gap:6px;padding:8px 12px 10px;margin:0;background:linear-gradient(180deg,var(--bg) 78%,rgba(11,15,23,0));overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -400,6 +410,7 @@ let mobileRound = 1;
 let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
 let mobileViewAll = false;
+let editingUnlocked = false;   // re-enable editing of an already-submitted bracket
 let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
@@ -475,30 +486,35 @@ function pickFilterBarHTML(){
   return `<div class="pfbar"><span class="pfbar-lbl">whose picks</span>${all}${chips}</div>`;
 }
 
+/* ---------- live results / locked scoring ----------
+   Once a bracket is locked (you submitted, or you're scouting someone), each
+   finished game shows your pick vs the real result: right = green ✓, wrong =
+   struck out + the team that actually advanced is shown with the final score.
+   Results source is the embedded 2026 data (BYPOS); for a live season, swap to
+   the ?action=ncaaBracket proxy (same shape: teams[].isWinner/score + state). */
+function bracketLocked(){ if(filteredEntry()) return true; return isSubmittedNow() && !editingUnlocked; }
+function showResultsMode(){ if(filteredEntry()) return true; if(editingUnlocked) return false; return revealed || isSubmittedNow(); }
+function gameFinal(pos){ return String((BYPOS[pos]||{}).state||'').toUpperCase()==='F'; }
+function actualWinnerTeam(pos){ return BYPOS[pos].teams.find(t=>t.isWinner) || null; }
+function actualLoserTeam(pos){ return BYPOS[pos].teams.find(t=>!t.isWinner) || null; }
+function unlockEditing(){ editingUnlocked = true; render(); }
+
 /* ---------- matchup rendering ---------- */
 function teamRow(team, pos, ready){
   if(!team || !team.nameShort){
     return '<div class="team-row tbd"><span class="seed"></span><span style="width:23px;flex:none"></span><span class="nm">TBD</span><span class="mark"></span></div>';
   }
   const vp = viewPicks();
-  const scouting = !!filteredEntry();      // viewing another player's bracket?
-  const rev = revealed && !scouting;       // reveal/results coloring only on your own bracket
+  const scouting = !!filteredEntry();
   const isPicked = vp[pos]===team.seoname;
-  const isActual = rev ? actualWinnerSeo(pos)===team.seoname : false;
   let cls = '', mark = '', rowStyle = '';
-  if(rev){
-    if(isPicked && isActual){ cls='correct'; mark='&#10003;'; }
-    else if(isPicked && !isActual){ cls='wrong'; mark='&#10007;'; }
-    if(isActual) cls += ' actualwin';
-    if(isActual && !isPicked) mark = '&#9670;';
-  } else if(isPicked){
-    cls='picked'; mark='&#9679;';
+  if(isPicked){
+    cls = 'picked'; mark = '&#9679;';
     if(scouting) rowStyle = ` style="box-shadow:inset 3px 0 0 ${playerColor(pickFilter)}"`;
   }
-  const clickable = (!rev && ready && !scouting) ? 'clickable' : '';
+  const clickable = (ready && !bracketLocked()) ? 'clickable' : '';
   const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
   const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
-  const sc = (rev && team.score!=null) ? team.score : '';
   const onclick = clickable ? `onclick="pick(${pos},'${team.seoname}')"` : '';
   // head-to-head pills only in "All picks" mode (when scouting, the whole bracket is theirs)
   let pills = '';
@@ -510,20 +526,60 @@ function teamRow(team, pos, ready){
       pills = `<span class="ppills">${shown}${extra}</span>`;
     }
   }
-  return `<div class="team-row ${cls} ${clickable}" ${onclick}${rowStyle}>${seed}${img}<span class="nm">${team.nameShort}</span>${pills}<span class="mark">${mark}</span><span class="sc">${sc}</span></div>`;
+  return `<div class="team-row ${cls} ${clickable}" ${onclick}${rowStyle}>${seed}${img}<span class="nm">${team.nameShort}</span>${pills}<span class="mark">${mark}</span><span class="sc"></span></div>`;
 }
 function matchCard(pos, slots){
   const slot = slots[pos];
   const ready = !!(slot.Top && slot.Bottom);
+  if(showResultsMode() && gameFinal(pos)) return scoredMatchCard(pos, slot);
   const g = BYPOS[pos];
   const d = g.date ? g.date.slice(0,5) : '';
-  let status = revealed ? 'FINAL' : (!ready ? 'awaiting' : (picks[pos] ? 'picked' : 'pick one'));
+  const status = !ready ? 'awaiting' : (viewPicks()[pos] ? 'picked' : 'pick one');
   return `<div class="match ${pos===401?'final-game':''}">
     <div class="mhead"><span>${d}</span><span>${status}</span></div>
     ${teamRow(slot.Top, pos, ready)}${teamRow(slot.Bottom, pos, ready)}
   </div>`;
 }
-const CUP = `<img class="cup-logo" src="https://assets.nhle.com/logos/playoffs/png/scp-20252026-cup.png" alt="" onerror="this.style.display='none'">`;
+// your bracket vs the real outcome for a finished game
+function scoredMatchCard(pos, slot){
+  const g = BYPOS[pos];
+  const vp = viewPicks();
+  const myPick = vp[pos];
+  const aw = actualWinnerTeam(pos), al = actualLoserTeam(pos);
+  const awSeo = aw ? aw.seoname : null;
+  const correct = myPick && myPick===awSeo;
+  const top = slot.Top, bot = slot.Bottom;
+  const userSeos = [top&&top.seoname, bot&&bot.seoname].filter(Boolean);
+  const sameMatchup = userSeos.length===2 && g.teams.every(t=>userSeos.indexOf(t.seoname)>=0);
+  const scoreFor = (seo)=>{ const t=g.teams.find(x=>x.seoname===seo); return (t && t.score!=null) ? t.score : ''; };
+  function predRow(team){
+    if(!team || !team.nameShort){
+      return '<div class="team-row tbd"><span class="seed"></span><span style="width:23px;flex:none"></span><span class="nm">TBD</span><span class="mark"></span></div>';
+    }
+    const isPick = team.seoname===myPick;
+    const isAW = team.seoname===awSeo;
+    let cls = '', mark = '';
+    if(isPick && correct){ cls='correct'; mark='&#10003;'; }
+    else if(isPick && !correct){ cls='wrong struck'; mark='&#10007;'; }
+    if(isAW && !isPick){ cls += ' actualwin'; mark='&#9670;'; }
+    const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
+    const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
+    const sc = sameMatchup ? `<span class="sc">${scoreFor(team.seoname)}</span>` : '<span class="sc"></span>';
+    return `<div class="team-row ${cls}">${seed}${img}<span class="nm">${team.nameShort}</span><span class="mark">${mark}</span>${sc}</div>`;
+  }
+  let rows = predRow(top) + predRow(bot);
+  if(!sameMatchup && aw){   // the team that actually advanced isn't in your predicted matchup — show it
+    const wsc = aw.score!=null ? aw.score : '', lsc = (al && al.score!=null) ? al.score : '';
+    const img = aw.logoUrl ? `<img src="${NCAA_IMG+aw.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
+    rows += `<div class="actual-strip"><span class="as-arrow">&#8627;</span>${img}<span class="as-name">${aw.nameShort}</span><span class="as-tag">advanced</span><span class="as-sc">${wsc}&#8211;${lsc}</span></div>`;
+  }
+  const d = g.date ? g.date.slice(0,5) : '';
+  return `<div class="match scored ${pos===401?'final-game':''}">
+    <div class="mhead"><span>${d}</span><span>FINAL</span></div>
+    ${rows}
+  </div>`;
+}
+const CUP = `<img class="cup-logo" src="frozen-four.png" alt="Frozen Four" onerror="this.style.display='none'">`;
 
 function desktopBracketHTML(slots){
   const cols = ROUNDS.map(R=>{
@@ -537,13 +593,13 @@ function desktopBracketHTML(slots){
 function mobileBracketHTML(slots){
   const tabs = ROUNDS.map((R,i)=>{
     const n=i+1, total=R.positions.length, done=roundPicked(R)===total;
-    const badge = (revealed && !pickFilter) ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
+    const badge = showResultsMode() ? `${R.positions.filter(p=>viewPicks()[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
     return `<button class="mtab ${n===mobileRound?'on':''} ${done?'complete':''}" onclick="goRound(${n})">${R.short}<span class="badge">${badge}</span></button>`;
   }).join('') + `<button class="mtab mtab-all" onclick="toggleViewAll()">&#10530;<span class="badge">all</span></button>`;
   const R = ROUNDS[mobileRound-1];
   const games = R.positions.map(p=>matchCard(p,slots)).join('');
   let nav = '';
-  if(!isSubmittedNow() && !filteredEntry()){
+  if(!bracketLocked()){
     if(mobileRound<4){
       const done = roundPicked(R)===R.positions.length;
       nav += `<button class="nextbtn ${done&&!revealed?'ready':''}" onclick="goRound(${mobileRound+1})">Next: ${ROUNDS[mobileRound].title} →</button>`;
@@ -562,11 +618,11 @@ function submitBarHTML(){
   if(fe) return `<div class="submitbar"><div class="submitnote">👀 Viewing <b>${fe.name}</b>'s bracket · tap “All picks” to return to yours</div></div>`;
   const made = picksMade();
   const entry = myEntry();
-  const isSubmitted = isSubmittedNow();
+  const isSubmitted = isSubmittedNow() && !editingUnlocked;
   let btn, note;
   if(isSubmitted){
     btn = `<button class="btn big" onclick="go('leaderboard')">✓ Submitted — view leaderboard →</button>`;
-    note = `Locked in as ${playerName}. Change a pick to re-submit.`;
+    note = `Locked in as ${playerName} · <span class="editlink" onclick="unlockEditing()">✏️ edit picks</span>`;
   } else if(made<15){
     btn = `<button class="btn primary big" disabled>✅ Submit my bracket</button>`;
     note = `${15-made} pick${15-made===1?'':'s'} left before you can submit`;
@@ -855,7 +911,7 @@ function renderConferences(){
 function renderChampBanner(slots){
   const f = filteredEntry();
   const scouting = !!f;
-  const rev = revealed && !scouting;
+  const rev = showResultsMode() && gameFinal(401);
   const vp = viewPicks();
   const whose = scouting ? `${f.name}'s champion` : 'Your champion';
   const champSeo = vp[401];
@@ -880,8 +936,8 @@ function renderChampBanner(slots){
 }
 
 function renderChrome(){
-  // hide the editing chrome once submitted (locked-in) or while scouting another player's bracket
-  const hideEdit = isSubmittedNow() || !!filteredEntry();
+  // hide the editing chrome once locked (submitted & not editing) or while scouting another player's bracket
+  const hideEdit = bracketLocked();
   const tools = document.getElementById('bracketTools');
   if(tools) tools.style.display = hideEdit ? 'none' : '';
   if(hideEdit){
@@ -958,7 +1014,7 @@ async function submitMine(){
   if(!playerName){ setName(); if(!playerName) return; }
   await Backend.submit({ name:playerName, picks:{...picks}, submittedAt:Date.now() });
   poolCache = await Backend.getAll();
-  revealed = false;
+  revealed = false; editingUnlocked = false;
   go('leaderboard');
 }
 
@@ -1001,7 +1057,7 @@ document.getElementById('revealBtn').addEventListener('click', ()=>{
   revealed = !revealed; render();
 });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  picks = {}; revealed = false; mobileRound = 1; savePicks(); render();
+  picks = {}; revealed = false; editingUnlocked = false; mobileRound = 1; savePicks(); render();
 });
 mq.addEventListener('change', e=>{ isMobile = e.matches; render(); });
 window.addEventListener('resize', syncAppbarH);
