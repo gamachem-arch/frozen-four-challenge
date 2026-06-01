@@ -22,11 +22,12 @@ body{padding:0 0 90px}
 .appbar h1{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;line-height:0.95;margin:0;letter-spacing:0.5px;text-transform:uppercase}
 .appbar h1 .ice{color:var(--accent)}
 .appbar .sub{color:var(--muted);font-size:12px;margin-top:3px;font-weight:500}
-.nav{display:flex;align-items:center;gap:10px;margin-top:11px}
-.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px}
-.tab{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.4px;padding:7px 13px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer}
+.apptop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nav{display:flex;margin-top:11px}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;width:100%}
+.tab{flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.3px;padding:8px 6px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
 .tab.on{background:var(--accent);color:#fff}
-.who{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.who{flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
 
 .btn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.5px;text-transform:uppercase;padding:7px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .1s,background .12s}
 .btn:active{transform:scale(0.96)}
@@ -135,6 +136,30 @@ body{padding:0 0 90px}
 .empty{margin:34px 26px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
 .lbactions{display:flex;gap:8px;justify-content:center;margin:18px 14px 0;flex-wrap:wrap}
 
+/* ---------- conferences ---------- */
+.confwrap{padding:0 14px}
+.confcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:11px}
+.confhead{display:flex;justify-content:space-between;align-items:baseline;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;letter-spacing:0.5px;text-transform:uppercase}
+.confhead span{font-size:11px;font-weight:600;color:var(--loss);letter-spacing:0.3px;text-transform:none}
+.confchamp{display:flex;align-items:center;gap:11px;margin-top:9px;padding:9px 10px;background:linear-gradient(135deg,rgba(251,191,36,0.10),transparent);border:1px solid rgba(251,191,36,0.28);border-radius:11px}
+.confchamp img{width:38px;height:38px;object-fit:contain;flex:none}
+.cmeta{flex:1;min-width:0}
+.ctitle{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;line-height:1}
+.cbid{font-size:11px;color:var(--gold);font-weight:600;margin-top:2px;letter-spacing:0.3px}
+.ctrophy{font-size:22px;flex:none}
+.conffinal{margin-top:9px;font-size:13px;color:var(--muted);line-height:1.4}
+.conffinal b{color:var(--text)}
+.confmore{margin-top:9px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.4px;color:var(--accent);cursor:pointer;text-transform:uppercase}
+.confresults{margin-top:8px;border-top:1px solid var(--border);padding-top:9px}
+.crday{margin-bottom:10px}
+.crd{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:var(--loss);margin-bottom:4px}
+.cr{display:flex;align-items:center;gap:8px;padding:4px 0}
+.cr .ct{flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr .ct.cw{color:var(--text);font-weight:800}
+.cr .ct.cl{color:var(--muted)}
+.cr .cs{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--muted);flex:none;min-width:46px;text-align:center}
+.cr .cs i{font-style:normal;opacity:.5;margin:0 1px}
+
 .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:16px 16px 0;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
 .legend i{font-style:normal;font-size:13px}
@@ -145,7 +170,10 @@ body{padding:0 0 90px}
 <body>
 
 <div class="appbar" id="appbar">
-  <h1>FROZEN <span class="ice">FOUR</span> CHALLENGE</h1>
+  <div class="apptop">
+    <h1>FROZEN <span class="ice">FOUR</span> CHALLENGE</h1>
+    <button class="who" id="whoBtn" onclick="setName()">👤</button>
+  </div>
   <div class="sub">NCAA DI Men's Ice Hockey · 2026</div>
   <div class="nav" id="nav"></div>
 </div>
@@ -240,8 +268,62 @@ const ROUNDS = [
   {key:4, short:"FINAL", positions:[401],                             title:"Championship",  sub:"Title Game"},
 ];
 
+/* 2026 conference tournaments (real results, from the ncaa-api scoreboard window Mar 11–21).
+   w='a'|'h' marks the winner. Champion = winner of the last game = the conference's NCAA auto-bid.
+   Live path for a real season: fetch ?action=ncaaScoreboard&date=YYYY/MM/DD across the
+   tournament week via the Apps Script proxy, then group same-conference games by conferenceSeo. */
+const CONF_2026 = [
+  { key:"nchc", name:"NCHC", champ:{name:"Denver", logoUrl:"/sites/default/files/images/logos/schools/d/denver.70.png"}, games:[
+    {d:"03/14", a:"Minn. Duluth", as:5, h:"North Dakota", hs:1, w:"a"},
+    {d:"03/14", a:"Western Mich.", as:1, h:"Denver", hs:2, w:"h"},
+    {d:"03/21", a:"Minn. Duluth", as:3, h:"Denver", hs:4, w:"h"} ]},
+  { key:"bigten", name:"Big Ten", champ:{name:"Michigan", logoUrl:"/sites/default/files/images/logos/schools/m/michigan.70.png"}, games:[
+    {d:"03/11", a:"Notre Dame", as:1, h:"Michigan", hs:6, w:"h"},
+    {d:"03/11", a:"Minnesota", as:2, h:"Penn St.", hs:6, w:"h"},
+    {d:"03/11", a:"Ohio St.", as:7, h:"Wisconsin", hs:1, w:"a"},
+    {d:"03/14", a:"Penn St.", as:2, h:"Michigan", hs:5, w:"h"},
+    {d:"03/14", a:"Ohio St.", as:3, h:"Michigan St.", hs:2, w:"a"},
+    {d:"03/21", a:"Ohio St.", as:3, h:"Michigan", hs:7, w:"h"} ]},
+  { key:"hockeyeast", name:"Hockey East", champ:{name:"Merrimack", logoUrl:"/sites/default/files/images/logos/schools/m/merrimack.70.png"}, games:[
+    {d:"03/11", a:"Vermont", as:1, h:"Boston U.", hs:4, w:"h"},
+    {d:"03/11", a:"New Hampshire", as:3, h:"Northeastern", hs:7, w:"h"},
+    {d:"03/11", a:"UMass Lowell", as:3, h:"Merrimack", hs:5, w:"h"},
+    {d:"03/13", a:"Maine", as:0, h:"Boston College", hs:5, w:"h"},
+    {d:"03/14", a:"Boston U.", as:3, h:"UConn", hs:5, w:"h"},
+    {d:"03/14", a:"Northeastern", as:1, h:"Massachusetts", hs:4, w:"h"},
+    {d:"03/14", a:"Merrimack", as:3, h:"Providence", hs:2, w:"a"},
+    {d:"03/20", a:"Merrimack", as:2, h:"Massachusetts", hs:0, w:"a"},
+    {d:"03/20", a:"Boston College", as:3, h:"UConn", hs:4, w:"h"},
+    {d:"03/21", a:"Merrimack", as:2, h:"UConn", hs:1, w:"a"} ]},
+  { key:"ecac", name:"ECAC Hockey", champ:{name:"Dartmouth", logoUrl:"/sites/default/files/images/logos/schools/d/dartmouth.70.png"}, games:[
+    {d:"03/13", a:"Clarkson", as:3, h:"Quinnipiac", hs:0, w:"a"},
+    {d:"03/13", a:"Colgate", as:1, h:"Dartmouth", hs:4, w:"h"},
+    {d:"03/13", a:"Harvard", as:3, h:"Cornell", hs:1, w:"a"},
+    {d:"03/13", a:"Union (NY)", as:2, h:"Princeton", hs:5, w:"h"},
+    {d:"03/14", a:"Clarkson", as:4, h:"Quinnipiac", hs:3, w:"a"},
+    {d:"03/14", a:"Colgate", as:1, h:"Dartmouth", hs:4, w:"h"},
+    {d:"03/14", a:"Harvard", as:0, h:"Cornell", hs:4, w:"h"},
+    {d:"03/14", a:"Union (NY)", as:2, h:"Princeton", hs:5, w:"h"},
+    {d:"03/15", a:"Harvard", as:2, h:"Cornell", hs:5, w:"h"},
+    {d:"03/20", a:"Clarkson", as:0, h:"Dartmouth", hs:4, w:"h"},
+    {d:"03/20", a:"Princeton", as:3, h:"Cornell", hs:2, w:"a"},
+    {d:"03/21", a:"Princeton", as:1, h:"Dartmouth", hs:2, w:"h"} ]},
+  { key:"ccha", name:"CCHA", champ:{name:"Minnesota St.", logoUrl:"/sites/default/files/images/logos/schools/m/minn-st-mankato.70.png"}, games:[
+    {d:"03/14", a:"Augustana (SD)", as:1, h:"St. Thomas (MN)", hs:2, w:"h"},
+    {d:"03/14", a:"Michigan Tech", as:2, h:"Minnesota St.", hs:7, w:"h"},
+    {d:"03/20", a:"St. Thomas (MN)", as:1, h:"Minnesota St.", hs:4, w:"h"} ]},
+  { key:"aha", name:"Atlantic Hockey", champ:{name:"Bentley", logoUrl:"/sites/default/files/images/logos/schools/b/bentley.70.png"}, games:[
+    {d:"03/13", a:"Holy Cross", as:2, h:"Bentley", hs:3, w:"h"},
+    {d:"03/13", a:"Robert Morris", as:1, h:"Sacred Heart", hs:5, w:"h"},
+    {d:"03/14", a:"Robert Morris", as:5, h:"Sacred Heart", hs:2, w:"a"},
+    {d:"03/14", a:"Holy Cross", as:0, h:"Bentley", hs:4, w:"h"},
+    {d:"03/15", a:"Robert Morris", as:0, h:"Sacred Heart", hs:5, w:"h"},
+    {d:"03/21", a:"Sacred Heart", as:2, h:"Bentley", hs:3, w:"h"} ]},
+];
+
 let revealed = false;
 let mobileRound = 1;
+let expandedConfs = {};
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
 let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
@@ -445,6 +527,51 @@ async function pollLeaderboard(){
   try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; }
 }
 
+/* ---------- conferences view ---------- */
+function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
+function fmtMD(d){ const mo={"01":"Jan","02":"Feb","03":"Mar","04":"Apr"}; const p=d.split("/"); return (mo[p[0]]||p[0])+" "+parseInt(p[1],10); }
+
+function buildConfResults(games){
+  const byd = {};
+  games.forEach(g=>{ (byd[g.d] = byd[g.d] || []).push(g); });
+  const days = Object.keys(byd).sort();
+  return '<div class="confresults">' + days.map(d=>{
+    const rows = byd[d].map(g=>{
+      const aw=g.w==='a', hw=g.w==='h';
+      return `<div class="cr">
+        <span class="ct ${aw?'cw':'cl'}">${g.a}</span>
+        <span class="cs">${g.as}<i>&#8211;</i>${g.hs}</span>
+        <span class="ct ${hw?'cw':'cl'}" style="text-align:right">${g.h}</span>
+      </div>`;
+    }).join('');
+    return `<div class="crday"><div class="crd">${fmtMD(d)}</div>${rows}</div>`;
+  }).join('') + '</div>';
+}
+
+function renderConferences(){
+  const cards = CONF_2026.map(c=>{
+    const fg = c.games[c.games.length-1];
+    const wName = fg.w==='a'?fg.a:fg.h, lName = fg.w==='a'?fg.h:fg.a;
+    const wS = fg.w==='a'?fg.as:fg.hs, lS = fg.w==='a'?fg.hs:fg.as;
+    const open = !!expandedConfs[c.key];
+    return `<div class="confcard">
+      <div class="confhead">${c.name}<span>${c.games.length} games</span></div>
+      <div class="confchamp">
+        <img src="${NCAA_IMG+c.champ.logoUrl}" alt="" onerror="this.style.visibility='hidden'">
+        <div class="cmeta"><div class="ctitle">${c.champ.name}</div><div class="cbid">🎟️ NCAA auto-bid</div></div>
+        <div class="ctrophy">🏆</div>
+      </div>
+      <div class="conffinal"><b>Final</b> · ${fmtMD(fg.d)} — <b>${wName} ${wS}</b> &#8211; ${lS} ${lName}</div>
+      <div class="confmore" onclick="toggleConf('${c.key}')">${open?'▾ hide full results':'▸ show full results ('+c.games.length+')'}</div>
+      ${open ? buildConfResults(c.games) : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('mount').innerHTML =
+    `<div class="lbhead">Conference Tournaments · 2026 · 6 champions → automatic NCAA bids</div>
+     <div class="confwrap">${cards}</div>
+     <div class="lbactions"><span style="color:var(--muted);font-size:12px">🏒 Win your conference, punch your ticket — every champ above is in the 16-team national bracket</span></div>`;
+}
+
 function renderChampBanner(slots){
   const champSeo = picks[401];
   const champSlot = slots[401];
@@ -491,10 +618,12 @@ function renderNav(){
   const n = poolCache.length;
   document.getElementById('nav').innerHTML = `
     <div class="tabs">
-      <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')">My Bracket</button>
+      <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')">Bracket</button>
       <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')">Leaderboard${n?` · ${n}`:''}</button>
-    </div>
-    <button class="who" onclick="setName()">${playerName?'👤 '+playerName:'👤 Set name'}</button>`;
+      <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')">Conferences</button>
+    </div>`;
+  const w = document.getElementById('whoBtn');
+  if(w) w.textContent = playerName ? '👤 '+playerName : '👤 Set name';
 }
 
 function syncAppbarH(){
@@ -508,6 +637,10 @@ function render(){
   if(currentView==='bracket'){
     bc.style.display = '';
     renderBracketView();
+  } else if(currentView==='conferences'){
+    bc.style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    renderConferences();
   } else {
     bc.style.display = 'none';
     document.getElementById('legend').innerHTML = '';
