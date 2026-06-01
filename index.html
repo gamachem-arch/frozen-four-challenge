@@ -179,6 +179,10 @@ body{padding:0 0 90px}
 .lbscore span{font-size:12px;color:var(--muted);font-weight:700}
 .empty{margin:34px 26px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
 .lbactions{display:flex;gap:8px;justify-content:center;margin:18px 14px 0;flex-wrap:wrap}
+.lbscope{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;margin:8px 14px 6px}
+.lbscope-btn{flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.3px;padding:8px;border:none;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.lbscope-btn.on{background:var(--accent);color:#fff}
+.grpbadge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:2px 7px;border-radius:10px;vertical-align:middle}
 
 /* ---------- live game cards ---------- */
 .lgwrap{padding:0 14px}
@@ -512,6 +516,8 @@ let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
 let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
 let lbPolling = false;
+let lbScope = "group";                 // 'group' = active pool · 'global' = every player in every group
+let lbGlobal = null;                   // cached { ok, entries, groups } for the global board
 const mq = window.matchMedia('(max-width: 720px)');
 let isMobile = mq.matches;
 
@@ -785,38 +791,61 @@ function renderBracketView(){
   renderChrome();
 }
 
+async function apiGetAllBrackets(){
+  if(!REMOTE) return { ok:true, entries: await Backend.getAll(), groups:{} };
+  try {
+    const r = await fetch(`${APPS_SCRIPT}?action=getAllBrackets`, {cache:"no-store"});
+    const d = await r.json();
+    return (d && d.ok) ? d : { ok:false, entries:[], groups:{} };
+  } catch(e){ return { ok:false, entries:[], groups:{} }; }
+}
+function setLbScope(s){ lbScope = s; lastLbSig = ""; renderLeaderboard(); }
 async function renderLeaderboard(opts){
   opts = opts || {};
-  if(!opts.fromCache) poolCache = await Backend.getAll();
+  const global = lbScope==='global';
+  let entries;
+  if(global){
+    if(!opts.fromCache) lbGlobal = await apiGetAllBrackets();
+    entries = (lbGlobal && lbGlobal.entries) || [];
+  } else {
+    if(!opts.fromCache) poolCache = await Backend.getAll();
+    entries = poolCache;
+  }
   const actualChamp = actualWinnerSeo(401);
-  const scored = poolCache.map(e=>({
-    name:e.name, picks:e.picks, submittedAt:e.submittedAt||0,
+  const groups = (global && lbGlobal && lbGlobal.groups) || {};
+  const myId = activeGroupId();
+  const scored = entries.map(e=>({
+    name:e.name, pool:e.pool||myId, picks:e.picks, submittedAt:e.submittedAt||0,
     correct:scoreEntry(e.picks), champSeo:e.picks[401]
   })).sort((a,b)=> b.correct-a.correct || a.submittedAt-b.submittedAt);
   _lbScored = scored;
 
   // on auto-refresh, skip the DOM update when nothing changed (no flicker / scroll jump)
-  const sig = scored.map(e=>e.name+':'+e.correct+':'+e.champSeo).join('|') + '|n=' + scored.length;
+  const sig = lbScope+'|'+scored.map(e=>e.name+':'+e.pool+':'+e.correct+':'+e.champSeo).join('|')+'|n='+scored.length;
   if(opts.onlyIfChanged && sig===lastLbSig) return;
   lastLbSig = sig;
 
   let rows;
-  if(!scored.length){
-    rows = `<div class="empty">No brackets in the pool yet.<br>Fill yours and hit <b>Submit</b>, or tap <b>Add demo friends</b> below to see the live leaderboard in action.</div>`;
+  if(global && lbGlobal && lbGlobal.ok===false){
+    rows = `<div class="empty">The global board needs the latest backend.<br>Redeploy the Apps Script to switch it on.</div>`;
+  } else if(!scored.length){
+    rows = global ? `<div class="empty">No brackets across any group yet.</div>`
+                  : `<div class="empty">No brackets in this group yet.<br>Fill yours and hit <b>Submit</b>${REMOTE?'.':', or tap <b>Add demo friends</b> below.'}</div>`;
   } else {
     rows = scored.map((e,i)=>{
       const ct = teamBySeo(e.champSeo);
-      const isYou = playerName && e.name.toLowerCase()===playerName.toLowerCase();
+      const isYou = playerName && e.name.toLowerCase()===playerName.toLowerCase() && (!global || e.pool===myId);
       const medal = ['🥇','🥈','🥉'][i] || `<span class="rk">${i+1}</span>`;
       const champOk = e.champSeo===actualChamp;
       const logo = ct.logoUrl ? `<img src="${NCAA_IMG+ct.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
       const tag = champOk ? `<span class="ok">&#10003;</span>` : `<span class="no">busted</span>`;
+      const grpBadge = global ? `<span class="grpbadge">${groups[e.pool]||e.pool}</span> ` : '';
       const rmini = ROUNDS.map(R=>`${R.short} ${R.positions.filter(p=>e.picks[p]===actualWinnerSeo(p)).length}/${R.positions.length}`).join(' &nbsp;·&nbsp; ');
       return `<div class="lbrow ${isYou?'you':''}" onclick="viewEntry(${i})">
         <div class="lbrank">${medal}</div>
         <div class="lbmain">
           <div class="lbname">${e.name}${isYou?' <span class="youtag">you</span>':''}</div>
-          <div class="lbchamp">🏆 ${logo} ${ct.nameShort} ${tag}</div>
+          <div class="lbchamp">${grpBadge}🏆 ${logo} ${ct.nameShort} ${tag}</div>
           <div class="lbmini">${rmini}</div>
         </div>
         <div class="lbscore"><b>${e.correct}</b><span>/15</span></div>
@@ -824,16 +853,20 @@ async function renderLeaderboard(opts){
       </div>`;
     }).join('');
   }
-  const devActions = REMOTE ? '' :
+  const toggle = `<div class="lbscope">
+    <button class="lbscope-btn ${!global?'on':''}" onclick="setLbScope('group')">My Group</button>
+    <button class="lbscope-btn ${global?'on':''}" onclick="setLbScope('global')">Everyone</button>
+  </div>`;
+  const head = global
+    ? `<div class="lbhead">All players · every group · scored live vs 2026</div>`
+    : `<div class="lbhead">${activeGroup().name} · scored live vs the real 2026 results</div>`;
+  const devActions = (!global && !REMOTE) ?
     `<div class="lbactions">
        <button class="btn" onclick="addDemoFriends()">➕ Add demo friends</button>
        <button class="btn ghost" onclick="clearPool()">Clear pool</button>
-     </div>`;
-  const liveNote = REMOTE ? `<div class="lbactions"><span style="color:var(--muted);font-size:12px">🔄 Auto-updating every 25s · share this link with friends to fill the board</span></div>` : '';
-  document.getElementById('mount').innerHTML =
-    `<div class="lbhead">Standings · scored live vs the real 2026 results &nbsp;·&nbsp; champ = <b>${teamBySeo(actualChamp).nameShort}</b></div>
-     ${rows}
-     ${devActions}${liveNote}`;
+     </div>` : '';
+  const liveNote = REMOTE ? `<div class="lbactions"><span style="color:var(--muted);font-size:12px">🔄 Auto-updating every 25s${global?' · everyone who\'s playing the app':' · share this link with friends to fill the board'}</span></div>` : '';
+  document.getElementById('mount').innerHTML = toggle + head + rows + devActions + liveNote;
   renderNav();
 }
 
