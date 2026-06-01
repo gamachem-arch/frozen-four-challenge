@@ -437,17 +437,17 @@ function buildSlotsFor(pk, prune){
   });
   return slots;
 }
-function buildSlots(){ return buildSlotsFor(picks, true); }
+function buildSlots(){ const f = filteredEntry(); return f ? buildSlotsFor(Object.assign({}, f.picks), false) : buildSlotsFor(picks, true); }
 
 function actualWinnerSeo(pos){ const w = BYPOS[pos].teams.find(t=>t.isWinner); return w ? w.seoname : null; }
 function picksMade(){ return ORDER.filter(p=>picks[p]).length; }
 function correctCount(){ return ORDER.filter(p=>picks[p] && picks[p]===actualWinnerSeo(p)).length; }
 function scoreEntry(pk){ return ORDER.filter(p=>pk[p] && pk[p]===actualWinnerSeo(p)).length; }
-function roundPicked(R){ return R.positions.filter(p=>picks[p]).length; }
+function roundPicked(R){ const vp = viewPicks(); return R.positions.filter(p=>vp[p]).length; }
 function myEntry(){ return playerName ? poolCache.find(e=>e.name.toLowerCase()===playerName.toLowerCase()) : null; }
 
 function pick(pos, seo){
-  if(revealed) return;
+  if(revealed || pickFilter) return;
   if(picks[pos]===seo) return;
   picks[pos] = seo;
   savePicks();
@@ -459,6 +459,8 @@ function poolNames(){ return poolCache.map(e=>e.name).sort((a,b)=> a.toLowerCase
 function playerColor(name){ const ns=poolNames(); const i=ns.findIndex(n=>n.toLowerCase()===String(name).toLowerCase()); return PALETTE[(i<0?0:i)%PALETTE.length]; }
 function playerAbbr(name){ const p=String(name).trim().split(/\s+/); const a = p.length>1 ? p.map(w=>w[0]).join('') : name.slice(0,3); return a.slice(0,3).toUpperCase(); }
 function playerPicksFor(pos, seo){ return poolCache.filter(e=>e.picks && e.picks[pos]===seo); }
+function filteredEntry(){ return pickFilter ? poolCache.find(e=>e.name.toLowerCase()===pickFilter.toLowerCase()) : null; }
+function viewPicks(){ const f = filteredEntry(); return f ? f.picks : picks; }
 function setPickFilterIdx(i){ const ns=poolNames(); pickFilter = (i<0) ? null : (ns[i]||null); render(); }
 function pickFilterBarHTML(){
   if(!poolCache.length) return '';
@@ -476,28 +478,30 @@ function teamRow(team, pos, ready){
   if(!team || !team.nameShort){
     return '<div class="team-row tbd"><span class="seed"></span><span style="width:23px;flex:none"></span><span class="nm">TBD</span><span class="mark"></span></div>';
   }
-  const isPicked = picks[pos]===team.seoname;
-  const isActual = revealed ? actualWinnerSeo(pos)===team.seoname : false;
-  let cls = '', mark = '';
-  if(revealed){
+  const vp = viewPicks();
+  const scouting = !!filteredEntry();      // viewing another player's bracket?
+  const rev = revealed && !scouting;       // reveal/results coloring only on your own bracket
+  const isPicked = vp[pos]===team.seoname;
+  const isActual = rev ? actualWinnerSeo(pos)===team.seoname : false;
+  let cls = '', mark = '', rowStyle = '';
+  if(rev){
     if(isPicked && isActual){ cls='correct'; mark='&#10003;'; }
     else if(isPicked && !isActual){ cls='wrong'; mark='&#10007;'; }
     if(isActual) cls += ' actualwin';
     if(isActual && !isPicked) mark = '&#9670;';
   } else if(isPicked){
     cls='picked'; mark='&#9679;';
+    if(scouting) rowStyle = ` style="box-shadow:inset 3px 0 0 ${playerColor(pickFilter)}"`;
   }
-  const clickable = (!revealed && ready) ? 'clickable' : '';
+  const clickable = (!rev && ready && !scouting) ? 'clickable' : '';
   const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
   const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
-  const sc = (revealed && team.score!=null) ? team.score : '';
+  const sc = (rev && team.score!=null) ? team.score : '';
   const onclick = clickable ? `onclick="pick(${pos},'${team.seoname}')"` : '';
-  // other players who advanced this team at this game
-  let pills = '', rowStyle = '';
-  if(poolCache.length){
-    const allPickers = playerPicksFor(pos, team.seoname);
-    const pickers = pickFilter ? allPickers.filter(p=>p.name.toLowerCase()===pickFilter.toLowerCase()) : allPickers;
-    if(pickFilter && pickers.length) rowStyle = ` style="box-shadow:inset 3px 0 0 ${playerColor(pickFilter)}"`;
+  // head-to-head pills only in "All picks" mode (when scouting, the whole bracket is theirs)
+  let pills = '';
+  if(poolCache.length && !scouting){
+    const pickers = playerPicksFor(pos, team.seoname);
     if(pickers.length){
       const shown = pickers.slice(0,3).map(p=>`<span class="ppill" style="background:${playerColor(p.name)}" title="${p.name}">${playerAbbr(p.name)}</span>`).join('');
       const extra = pickers.length>3 ? `<span class="ppill more">+${pickers.length-3}</span>` : '';
@@ -531,13 +535,13 @@ function desktopBracketHTML(slots){
 function mobileBracketHTML(slots){
   const tabs = ROUNDS.map((R,i)=>{
     const n=i+1, total=R.positions.length, done=roundPicked(R)===total;
-    const badge = revealed ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
+    const badge = (revealed && !pickFilter) ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
     return `<button class="mtab ${n===mobileRound?'on':''} ${done?'complete':''}" onclick="goRound(${n})">${R.short}<span class="badge">${badge}</span></button>`;
   }).join('') + `<button class="mtab mtab-all" onclick="toggleViewAll()">&#10530;<span class="badge">all</span></button>`;
   const R = ROUNDS[mobileRound-1];
   const games = R.positions.map(p=>matchCard(p,slots)).join('');
   let nav = '';
-  if(!isSubmittedNow()){
+  if(!isSubmittedNow() && !filteredEntry()){
     if(mobileRound<4){
       const done = roundPicked(R)===R.positions.length;
       nav += `<button class="nextbtn ${done&&!revealed?'ready':''}" onclick="goRound(${mobileRound+1})">Next: ${ROUNDS[mobileRound].title} →</button>`;
@@ -552,6 +556,8 @@ function mobileBracketHTML(slots){
 /* ---------- submit bar ---------- */
 function isSubmittedNow(){ const e = myEntry(); return !!(e && JSON.stringify(e.picks)===JSON.stringify(picks)); }
 function submitBarHTML(){
+  const fe = filteredEntry();
+  if(fe) return `<div class="submitbar"><div class="submitnote">👀 Viewing <b>${fe.name}</b>'s bracket · tap “All picks” to return to yours</div></div>`;
   const made = picksMade();
   const entry = myEntry();
   const isSubmitted = isSubmittedNow();
@@ -845,7 +851,12 @@ function renderConferences(){
 }
 
 function renderChampBanner(slots){
-  const champSeo = picks[401];
+  const f = filteredEntry();
+  const scouting = !!f;
+  const rev = revealed && !scouting;
+  const vp = viewPicks();
+  const whose = scouting ? `${f.name}'s champion` : 'Your champion';
+  const champSeo = vp[401];
   const champSlot = slots[401];
   const champTeam = champSeo ? [champSlot.Top,champSlot.Bottom].find(t=>t&&t.seoname===champSeo) : null;
   const actualChamp = BYPOS[401].teams.find(t=>t.isWinner);
@@ -853,25 +864,25 @@ function renderChampBanner(slots){
   if(!champTeam){
     banner.innerHTML = `<div class="champ-banner empty">
       <div class="trophy" style="margin-left:0;opacity:.5">🏆</div>
-      <div><div class="lbl">Your champion</div><div class="name" style="color:var(--muted)">— pick the final —</div></div></div>`;
+      <div><div class="lbl">${whose}</div><div class="name" style="color:var(--muted)">${scouting?'— not picked yet —':'— pick the final —'}</div></div></div>`;
     return;
   }
   const isRight = champSeo===actualChamp.seoname;
-  const right = (revealed && !isRight)
+  const right = (rev && !isRight)
     ? `<div style="margin-left:auto;text-align:right"><div class="actual">actual champ<br><b>${actualChamp.nameShort}</b></div></div>`
     : `<div class="trophy">🏆</div>`;
-  const lbl = revealed ? (isRight ? 'Champion — you nailed it!' : "Your champion — didn't win it") : 'Your champion';
-  banner.innerHTML = `<div class="champ-banner ${revealed&&!isRight?'miss':''}">
+  const lbl = rev ? (isRight ? 'Champion — you nailed it!' : "Your champion — didn't win it") : whose;
+  banner.innerHTML = `<div class="champ-banner ${rev&&!isRight?'miss':''}">
     <img src="${NCAA_IMG+champTeam.logoUrl}" alt="" onerror="this.style.visibility='hidden'">
     <div><div class="lbl">${lbl}</div><div class="name">${champTeam.nameShort}</div></div>${right}</div>`;
 }
 
 function renderChrome(){
-  // once your bracket is submitted, hide the editing chrome (locked-in feel)
-  const submitted = isSubmittedNow();
+  // hide the editing chrome once submitted (locked-in) or while scouting another player's bracket
+  const hideEdit = isSubmittedNow() || !!filteredEntry();
   const tools = document.getElementById('bracketTools');
-  if(tools) tools.style.display = submitted ? 'none' : '';
-  if(submitted){
+  if(tools) tools.style.display = hideEdit ? 'none' : '';
+  if(hideEdit){
     document.getElementById('hint').style.display = 'none';
     document.getElementById('legend').innerHTML = '';
     return;
