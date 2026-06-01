@@ -193,12 +193,22 @@ body{padding:0 0 90px}
 /* ---------- full-screen pickable bracket (View all) ---------- */
 .pkall{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column;animation:fbfade .15s ease}
 .pkall-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)}
-.pkall-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:center}
-.pkall-body .bracket-scroll{width:100%}
+.pkall-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
+.pkall-body .bracket-scroll{flex:1;display:flex;align-items:center;width:100%}
 .pkall-body .bracket{margin:auto}
 .pkall-foot{border-top:1px solid var(--border);padding-bottom:6px}
 .mtab-all{border-color:var(--accent)!important;color:var(--accent)!important;flex:0 0 auto!important;min-width:50px!important}
 .lbview{flex:none;font-size:15px;opacity:.55;padding-left:2px}
+
+/* ---------- players' picks: pills + filter ---------- */
+.pfbar{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 14px 8px}
+.pfbar-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;font-weight:700;flex:none}
+.pfchip{flex:none;display:inline-flex;align-items:center;gap:5px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap}
+.pfchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pfdot{width:8px;height:8px;border-radius:50%;flex:none}
+.ppills{display:inline-flex;gap:3px;align-items:center;flex:none;margin-left:5px}
+.ppill{font-family:'Inter',sans-serif;font-size:8px;font-weight:800;color:#fff;border-radius:4px;padding:2px 4px;letter-spacing:0.2px;line-height:1;min-width:14px;text-align:center}
+.ppill.more{background:var(--surface2)!important;color:var(--muted)}
 
 .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:16px 16px 0;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
@@ -367,6 +377,8 @@ let mobileRound = 1;
 let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
 let pickAllOpen = false;
+let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
+const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
 let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
@@ -421,6 +433,23 @@ function pick(pos, seo){
   render();
 }
 
+/* ---------- players' picks (pills + filter) ---------- */
+function poolNames(){ return poolCache.map(e=>e.name).sort((a,b)=> a.toLowerCase()<b.toLowerCase()?-1:1); }
+function playerColor(name){ const ns=poolNames(); const i=ns.findIndex(n=>n.toLowerCase()===String(name).toLowerCase()); return PALETTE[(i<0?0:i)%PALETTE.length]; }
+function playerAbbr(name){ const p=String(name).trim().split(/\s+/); const a = p.length>1 ? p.map(w=>w[0]).join('') : name.slice(0,3); return a.slice(0,3).toUpperCase(); }
+function playerPicksFor(pos, seo){ return poolCache.filter(e=>e.picks && e.picks[pos]===seo); }
+function setPickFilterIdx(i){ const ns=poolNames(); pickFilter = (i<0) ? null : (ns[i]||null); render(); }
+function pickFilterBarHTML(){
+  if(!poolCache.length) return '';
+  const all = `<button class="pfchip ${!pickFilter?'on':''}" onclick="setPickFilterIdx(-1)">All picks</button>`;
+  const chips = poolNames().map((n,i)=>{
+    const on = pickFilter && pickFilter.toLowerCase()===n.toLowerCase();
+    const col = playerColor(n);
+    return `<button class="pfchip ${on?'on':''}" ${on?`style="background:${col};border-color:${col};color:#fff"`:''} onclick="setPickFilterIdx(${i})"><span class="pfdot" style="background:${col}"></span>${n}</button>`;
+  }).join('');
+  return `<div class="pfbar"><span class="pfbar-lbl">whose picks</span>${all}${chips}</div>`;
+}
+
 /* ---------- matchup rendering ---------- */
 function teamRow(team, pos, ready){
   if(!team || !team.nameShort){
@@ -442,7 +471,19 @@ function teamRow(team, pos, ready){
   const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
   const sc = (revealed && team.score!=null) ? team.score : '';
   const onclick = clickable ? `onclick="pick(${pos},'${team.seoname}')"` : '';
-  return `<div class="team-row ${cls} ${clickable}" ${onclick}>${seed}${img}<span class="nm">${team.nameShort}</span><span class="mark">${mark}</span><span class="sc">${sc}</span></div>`;
+  // other players who advanced this team at this game
+  let pills = '', rowStyle = '';
+  if(poolCache.length){
+    const allPickers = playerPicksFor(pos, team.seoname);
+    const pickers = pickFilter ? allPickers.filter(p=>p.name.toLowerCase()===pickFilter.toLowerCase()) : allPickers;
+    if(pickFilter && pickers.length) rowStyle = ` style="box-shadow:inset 3px 0 0 ${playerColor(pickFilter)}"`;
+    if(pickers.length){
+      const shown = pickers.slice(0,3).map(p=>`<span class="ppill" style="background:${playerColor(p.name)}" title="${p.name}">${playerAbbr(p.name)}</span>`).join('');
+      const extra = pickers.length>3 ? `<span class="ppill more">+${pickers.length-3}</span>` : '';
+      pills = `<span class="ppills">${shown}${extra}</span>`;
+    }
+  }
+  return `<div class="team-row ${cls} ${clickable}" ${onclick}${rowStyle}>${seed}${img}<span class="nm">${team.nameShort}</span>${pills}<span class="mark">${mark}</span><span class="sc">${sc}</span></div>`;
 }
 function matchCard(pos, slots){
   const slot = slots[pos];
@@ -509,7 +550,7 @@ function renderBracketView(){
   const slots = buildSlots();
   savePicks();
   const inner = isMobile ? mobileBracketHTML(slots) : desktopBracketHTML(slots);
-  document.getElementById('mount').innerHTML = inner + submitBarHTML();
+  document.getElementById('mount').innerHTML = pickFilterBarHTML() + inner + submitBarHTML();
   renderChampBanner(slots);
   renderChrome();
 }
@@ -651,7 +692,7 @@ function renderPickAll(){
        <div class="fbov-title">Full Bracket${revealed?' · Results':' · tap to pick'}</div>
        ${chip}
      </div>
-     <div class="pkall-body">${desktopBracketHTML(slots)}</div>
+     <div class="pkall-body">${pickFilterBarHTML()}${desktopBracketHTML(slots)}</div>
      <div class="pkall-foot">${submitBarHTML()}</div>`;
 }
 
