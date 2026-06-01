@@ -142,6 +142,7 @@ body{padding:0 0 90px}
 .nhl-sec{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin:7px 0 4px}
 .nhlrow{display:flex;align-items:center;gap:7px;padding:3px 0}
 .nhl-em{flex:none;font-size:12px;width:18px;text-align:center}
+.nhl-jersey{flex:none;width:22px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--muted)}
 .nhl-logo{flex:none;width:18px;height:18px;object-fit:contain}
 .nhl-nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nhl-pos{flex:none;font-size:9px;color:var(--muted);font-weight:700}
@@ -707,8 +708,8 @@ function teamNhl(seo){
   const drafted = [], prospects = [];
   Object.values(roster).forEach(pl=>{
     const k = normName(pl.first+' '+pl.last);
-    if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.drafted[k] });
-    else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.prospects[k] });
+    if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, ...idx.drafted[k] });
+    else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, ...idx.prospects[k] });
   });
   drafted.sort((a,b)=> a.yr-b.yr || a.pk-b.pk);
   prospects.sort((a,b)=> a.rank-b.rank);
@@ -728,8 +729,9 @@ function teamNhlPanelHTML(pos, seo){
   const r = teamNhl(seo);
   if(!r || (!r.drafted.length && !r.prospects.length))
     return `<div class="nhlpanel"><div class="boxpanel-msg">No drafted players or top-64 prospects on this roster.</div></div>`;
-  const dr = r.drafted.map(p=>`<div class="nhlrow"><span class="nhl-em">🏒</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-right"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.style.display='none'"><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></span></div>`).join('');
-  const pr = r.prospects.map(p=>`<div class="nhlrow"><span class="nhl-em">📋</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
+  const jersey = n=>(n!=null&&n!=='')?`<span class="nhl-jersey">${n}</span>`:`<span class="nhl-jersey empty"></span>`;
+  const dr = r.drafted.map(p=>`<div class="nhlrow">${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-right"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.style.display='none'"><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></span></div>`).join('');
+  const pr = r.prospects.map(p=>`<div class="nhlrow">${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
   return `<div class="nhlpanel">
     ${dr ? `<div class="nhl-sec">NHL drafted</div>${dr}` : ''}
     ${pr ? `<div class="nhl-sec">${nhlDraft.prospectYear} draft-eligible (top 64)</div>${pr}` : ''}
