@@ -165,6 +165,42 @@ body{padding:0 0 90px}
 .empty{margin:34px 26px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
 .lbactions{display:flex;gap:8px;justify-content:center;margin:18px 14px 0;flex-wrap:wrap}
 
+/* ---------- live game cards ---------- */
+.lgwrap{padding:0 14px}
+.lgcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:12px}
+.lgcard.islive{border-color:rgba(239,68,68,0.45);box-shadow:0 0 0 1px rgba(239,68,68,0.15)}
+.lg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.lg-round{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted)}
+.lg-live{display:inline-flex;align-items:center;gap:5px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.5px;color:#fff;background:#dc2626;padding:3px 9px;border-radius:12px}
+.lg-dot{width:7px;height:7px;border-radius:50%;background:#fff;animation:lgpulse 1.1s infinite}
+@keyframes lgpulse{0%,100%{opacity:1}50%{opacity:.35}}
+.lg-fin{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.5px;color:var(--muted);background:var(--surface2);padding:3px 9px;border-radius:12px}
+.lg-pre{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;color:var(--accent)}
+.lg-score{display:flex;align-items:center;gap:8px}
+.lg-team{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.lg-team.home{flex-direction:row-reverse}
+.lg-team img{width:34px;height:34px;object-fit:contain;flex:none}
+.lg-tn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.lg-team.win .lg-tn{color:var(--text);font-weight:800}
+.lg-pts{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;line-height:1;color:var(--muted);flex:none}
+.lg-team.win .lg-pts{color:var(--text)}
+.lg-at{font-size:11px;color:var(--loss);font-weight:700;flex:none}
+.lg-bars{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.lg-stat-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px}
+.lg-stat-top b{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--text);min-width:34px}
+.lg-stat-top b:last-child{text-align:right}
+.lg-stat-top span{color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-size:10px;font-weight:700}
+.lg-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg)}
+.lg-bar .a{background:#f97316}
+.lg-bar .h{background:#3b82f6}
+.lg-goals{display:flex;gap:10px;margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.lg-goalcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.lg-goalcol.home{text-align:right;align-items:flex-end}
+.lg-gt{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:2px}
+.lg-scorer{font-size:12px;color:var(--text);font-weight:500}
+.lg-scorer em{color:var(--muted);font-style:normal;font-size:10px}
+.lg-noscore{font-size:11px;color:var(--loss);font-style:italic}
+
 /* ---------- conferences ---------- */
 .confwrap{padding:0 14px}
 .confcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:11px}
@@ -411,6 +447,10 @@ let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
 let mobileViewAll = false;
 let editingUnlocked = false;   // re-enable editing of an already-submitted bracket
+const LIVE_DEMO_DATE = "2026/03/27";   // off-season fallback (a real tourney day); production uses today
+let liveGames = [];            // scoreboard game objects (tournament only)
+let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore
+let liveLoading = false;
 let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
@@ -698,9 +738,9 @@ async function renderLeaderboard(opts){
 }
 
 async function pollLeaderboard(){
-  if(currentView!=='leaderboard' || lbPolling) return;
-  lbPolling = true;
-  try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; }
+  if(lbPolling) return;
+  if(currentView==='leaderboard'){ lbPolling = true; try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; } }
+  else if(currentView==='live'){ lbPolling = true; try { await refreshLive(); } catch(e){} finally { lbPolling = false; } }
 }
 
 /* ---------- full bracket overlay (converging 16-team diagram) ---------- */
@@ -863,6 +903,109 @@ async function handleGroupHash(){
   try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
 }
 
+/* ---------- live games (inline cards) ---------- */
+async function apiScoreboard(date){
+  if(!REMOTE) return [];
+  try {
+    const u = `${APPS_SCRIPT}?action=ncaaScoreboard${date?`&date=${encodeURIComponent(date)}`:''}`;
+    const r = await fetch(u, {cache:"no-store"}); const d = await r.json();
+    return (d.games||[]).map(x=>x.game).filter(g=>g && g.championshipId);   // tournament games only
+  } catch(e){ return []; }
+}
+async function apiGame(id){
+  if(!REMOTE) return null;
+  try { const r = await fetch(`${APPS_SCRIPT}?action=ncaaGame&id=${encodeURIComponent(id)}`, {cache:"no-store"}); return await r.json(); }
+  catch(e){ return null; }
+}
+function boxStats(box){
+  if(!box || !box.teamBoxscore) return null;
+  const meta = {}; (box.teams||[]).forEach(t=>meta[String(t.teamId)]=t);
+  const num = v=>parseInt(v||'0',10)||0;
+  const out = {};
+  box.teamBoxscore.forEach(tb=>{
+    const t = meta[String(tb.teamId)]; if(!t) return;
+    const s = tb.teamStats||{};
+    out[t.seoname] = {
+      color:t.color, sog:num(s.shots), ppg:num(s.powerPlayGoals), ppo:num(s.powerPlayOpportunities),
+      saves:num(s.saves), fw:num(s.facewon), fl:num(s.facelost), blk:num(s.blk), pim:num(s.minutes),
+      scorers:(tb.playerStats||[]).filter(p=>num(p.goals)>0).map(p=>({num:p.number, name:p.lastName, g:num(p.goals), a:num(p.assists)}))
+    };
+  });
+  return out;
+}
+function liveLogo(seo){
+  if(TEAMS[seo] && TEAMS[seo].logoUrl) return NCAA_IMG + TEAMS[seo].logoUrl;
+  return `${NCAA_IMG}/sites/default/files/images/logos/schools/${(seo||'x')[0]}/${seo}.70.png`;
+}
+async function refreshLive(){
+  let games = await apiScoreboard(null);              // today's tournament games
+  if(!games.length) games = await apiScoreboard(LIVE_DEMO_DATE);   // off-season demo fallback
+  liveGames = games;
+  paintLive();
+  for(const g of games){
+    const st = String(g.gameState||'').toLowerCase();
+    if(st==='final' || st==='live'){
+      const b = await apiGame(g.gameID);
+      liveBox[g.gameID] = boxStats(b);
+      if(currentView==='live') paintLive();
+    }
+  }
+}
+async function renderLive(){
+  paintLive();
+  if(!liveLoading && !liveGames.length){ liveLoading = true; await refreshLive(); liveLoading = false; }
+}
+function paintLive(){
+  if(currentView!=='live') return;
+  const mount = document.getElementById('mount');
+  if(!liveGames.length){
+    mount.innerHTML = `<div class="lbhead">Live Games</div><div class="empty">${liveLoading?'Loading games…':'No tournament games right now.<br>This fills with live scores &amp; stats once games are on.'}</div>`;
+    return;
+  }
+  mount.innerHTML = `<div class="lbhead">Live Games · scores &amp; stats update automatically</div><div class="lgwrap">${liveGames.map(liveGameCard).join('')}</div>`;
+}
+function liveGameCard(g){
+  const a=g.away, h=g.home, aSeo=a.names.seo, hSeo=h.names.seo;
+  const st = String(g.gameState||'').toLowerCase();
+  const aSc = (a.score!=null&&a.score!=='') ? a.score : '', hSc = (h.score!=null&&h.score!=='') ? h.score : '';
+  const aWin = st==='final' && (+aSc)>(+hSc), hWin = st==='final' && (+hSc)>(+aSc);
+  let status;
+  if(st==='live') status = `<span class="lg-live"><span class="lg-dot"></span>LIVE · ${g.currentPeriod||''} ${g.contestClock||''}</span>`;
+  else if(st==='final') status = `<span class="lg-fin">FINAL</span>`;
+  else status = `<span class="lg-pre">${g.startTime||'TBD'}</span>`;
+  const round = (g.championshipGame && g.championshipGame.round && g.championshipGame.round.title) || 'Tournament';
+  const stats = liveBox[g.gameID];
+  const bars = (st!=='pre' && stats) ? liveStatBars(stats[aSeo], stats[hSeo]) : '';
+  const goals = (st!=='pre' && stats) ? liveGoals(stats[aSeo], stats[hSeo], a.names.short, h.names.short) : '';
+  const tm = (t,seo,sc,win,home)=>`<div class="lg-team ${home?'home':''} ${win?'win':''}">
+    <img src="${liveLogo(seo)}" alt="" onerror="this.style.visibility='hidden'">
+    <span class="lg-tn">${t.names.short}</span><span class="lg-pts">${sc}</span></div>`;
+  return `<div class="lgcard ${st==='live'?'islive':''}">
+    <div class="lg-head"><span class="lg-round">${round}</span>${status}</div>
+    <div class="lg-score">${tm(a,aSeo,aSc,aWin,false)}<span class="lg-at">@</span>${tm(h,hSeo,hSc,hWin,true)}</div>
+    ${bars}${goals}
+  </div>`;
+}
+function liveStatBars(a,h){
+  if(!a || !h) return '';
+  const bar=(label,av,hv)=>{
+    const A=+av||0, H=+hv||0, tot=(A+H)||1, ap=Math.round(A/tot*100);
+    return `<div class="lg-stat"><div class="lg-stat-top"><b>${av}</b><span>${label}</span><b>${hv}</b></div>
+      <div class="lg-bar"><i class="a" style="width:${ap}%"></i><i class="h" style="width:${100-ap}%"></i></div></div>`;
+  };
+  const ppA=a.ppg, ppH=h.ppg, ppTot=(ppA+ppH)||1, ppAp=Math.round(ppA/ppTot*100);
+  const pp = `<div class="lg-stat"><div class="lg-stat-top"><b>${a.ppg}/${a.ppo}</b><span>Power Play</span><b>${h.ppg}/${h.ppo}</b></div>
+      <div class="lg-bar"><i class="a" style="width:${ppAp}%"></i><i class="h" style="width:${100-ppAp}%"></i></div></div>`;
+  return `<div class="lg-bars">${bar('Shots',a.sog,h.sog)}${pp}${bar('Faceoffs Won',a.fw,h.fw)}${bar('Blocks',a.blk,h.blk)}${bar('Penalty Min',a.pim,h.pim)}</div>`;
+}
+function liveGoals(a,h,aName,hName){
+  if(!a && !h) return '';
+  const list=(s)=> (s && s.scorers && s.scorers.length)
+    ? s.scorers.map(p=>`<span class="lg-scorer">#${p.num} ${p.name}${p.g>1?' ('+p.g+')':''}${p.a?` <em>${p.a}a</em>`:''}</span>`).join('')
+    : '<span class="lg-noscore">no goals</span>';
+  return `<div class="lg-goals"><div class="lg-goalcol"><div class="lg-gt">${aName}</div>${list(a)}</div><div class="lg-goalcol home"><div class="lg-gt">${hName}</div>${list(h)}</div></div>`;
+}
+
 /* ---------- conferences view ---------- */
 function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
 function fmtMD(d){ const mo={"01":"Jan","02":"Feb","03":"Mar","04":"Apr"}; const p=d.split("/"); return (mo[p[0]]||p[0])+" "+parseInt(p[1],10); }
@@ -970,8 +1113,9 @@ function renderNav(){
   document.getElementById('nav').innerHTML = `
     <div class="tabs">
       <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')">Bracket</button>
-      <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')">Leaderboard${n?` · ${n}`:''}</button>
-      <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')">Conferences</button>
+      <button class="tab ${currentView==='live'?'on':''}" onclick="go('live')">Live</button>
+      <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')">Board${n?` · ${n}`:''}</button>
+      <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')">Confs</button>
     </div>`;
   const w = document.getElementById('whoBtn');
   if(w) w.textContent = playerName ? '👤 '+playerName : '👤 Set name';
@@ -994,6 +1138,10 @@ function render(){
     bc.style.display = 'none';
     document.getElementById('legend').innerHTML = '';
     renderConferences();
+  } else if(currentView==='live'){
+    bc.style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    renderLive();
   } else {
     bc.style.display = 'none';
     document.getElementById('legend').innerHTML = '';
