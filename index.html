@@ -340,6 +340,9 @@ const store = {
    ==================================================================== */
 const REMOTE = true;    // <-- live: picks sync through the Apps Script + Sheet
 const APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbz7gPRN_7zWzrd51tlyo4_rEeSFX_7I2F_Jop5kojdcLg8X51hFW42Zhb4by7L5JH1PXg/exec";
+// Bracket lock: 'open' = always editable (good for off-season pick-em); 'auto' = lock at first
+// puck-drop (earliest game start from the live feed) — the real tournament behavior; 'locked' = force-lock.
+const LOCK_MODE = "open";
 
 /* ---- groups (each group = its own pool, identified by id) ---- */
 const DEFAULT_GROUP = { id:"frozenfour-2026", name:"Frozen Four 2026", code:"FROZEN26" };
@@ -477,7 +480,7 @@ function parseLiveBracket(json){
     if(!champ || !champ.games || champ.games.length < ORDER.length) return null;
     const games = champ.games.map(g=>({
       pos: g.bracketPositionId, victorPos: g.victorBracketPositionId, victorSlot: g.victorGamePosition,
-      state: g.gameState || '', date: g.startDate || '', time: g.startTime || '', contestId: g.contestId,
+      state: g.gameState || '', date: g.startDate || '', time: g.startTime || '', contestId: g.contestId, epoch: g.startTimeEpoch || null,
       teams: (g.teams||[]).map(t=>({
         isTop: !!t.isTop, isWinner: !!t.isWinner, logoUrl: t.logoUrl || '',
         score: (t.score!=null) ? t.score : null, seed: t.seed || null,
@@ -545,7 +548,7 @@ function roundPicked(R){ const vp = viewPicks(); return R.positions.filter(p=>vp
 function myEntry(){ return playerName ? poolCache.find(e=>e.name.toLowerCase()===playerName.toLowerCase()) : null; }
 
 function pick(pos, seo){
-  if(revealed || pickFilter) return;
+  if(revealed || pickFilter || bracketLocked()) return;
   if(picks[pos]===seo) return;
   picks[pos] = seo;
   savePicks();
@@ -577,10 +580,18 @@ function pickFilterBarHTML(){
    struck out + the team that actually advanced is shown with the final score.
    Results source is the embedded 2026 data (BYPOS); for a live season, swap to
    the ?action=ncaaBracket proxy (same shape: teams[].isWinner/score + state). */
-function bracketLocked(){ if(filteredEntry()) return true; return isSubmittedNow() && !editingUnlocked; }
-function showResultsMode(){ if(filteredEntry()) return true; if(editingUnlocked) return false; return revealed || isSubmittedNow(); }
+function bracketLocked(){ if(tourneyLocked()) return true; if(filteredEntry()) return true; return isSubmittedNow() && !editingUnlocked; }
+function showResultsMode(){ if(filteredEntry()) return true; if(tourneyLocked()) return true; if(editingUnlocked) return false; return revealed || isSubmittedNow(); }
 function gameFinal(pos){ return String((BYPOS[pos]||{}).state||'').toUpperCase()==='F'; }
 function gameLive(pos){ var s=String((BYPOS[pos]||{}).state||'').toLowerCase(); return s==='live'||s==='l'||s==='in_progress'; }
+function nowEpoch(){ return Math.floor(Date.now()/1000); }
+function firstPuckEpoch(){ let m=null; ACTUAL.games.forEach(g=>{ if(g.epoch && (m===null||g.epoch<m)) m=g.epoch; }); return m; }
+function tourneyLocked(){
+  if(LOCK_MODE==='open') return false;
+  if(LOCK_MODE==='locked') return true;
+  const fp = firstPuckEpoch();            // 'auto'
+  return fp!=null && nowEpoch() >= fp;
+}
 function toggleGameBox(pos){ expandedGames[pos] = !expandedGames[pos]; if(expandedGames[pos]) ensureBox(pos); render(); }
 async function ensureBox(pos){
   const gid = GAME_IDS[pos]; if(!gid) return;
@@ -734,6 +745,10 @@ function isSubmittedNow(){ const e = myEntry(); return !!(e && JSON.stringify(e.
 function submitBarHTML(){
   const fe = filteredEntry();
   if(fe) return `<div class="submitbar"><div class="submitnote">👀 Viewing <b>${fe.name}</b>'s bracket · tap “All picks” to return to yours</div></div>`;
+  if(tourneyLocked()){
+    const e = myEntry();
+    return `<div class="submitbar"><div class="submitnote">🔒 Brackets are locked — the tournament has started.${e?' Your bracket is in!':' (no entry submitted)'}</div></div>`;
+  }
   const made = picksMade();
   const entry = myEntry();
   const isSubmitted = isSubmittedNow() && !editingUnlocked;
@@ -1165,16 +1180,24 @@ function renderChampBanner(slots){
 }
 
 function renderChrome(){
-  // hide the editing chrome once locked (submitted & not editing) or while scouting another player's bracket
-  const hideEdit = bracketLocked();
   const tools = document.getElementById('bracketTools');
-  if(tools) tools.style.display = hideEdit ? 'none' : '';
-  if(hideEdit){
-    document.getElementById('hint').style.display = 'none';
+  const hint = document.getElementById('hint');
+  // tournament-wide lock at first puck-drop — everyone's picks are final
+  if(tourneyLocked()){
+    if(tools) tools.style.display = 'none';
+    hint.style.display = ''; hint.innerHTML = '🔒 <b>Brackets locked</b> — the tournament has started; picks are final.';
     document.getElementById('legend').innerHTML = '';
     return;
   }
-  document.getElementById('hint').style.display = '';
+  // hide the editing chrome once locked (submitted & not editing) or while scouting another player's bracket
+  const hideEdit = bracketLocked();
+  if(tools) tools.style.display = hideEdit ? 'none' : '';
+  if(hideEdit){
+    hint.style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    return;
+  }
+  hint.style.display = '';
   const made = picksMade();
   const chip = document.getElementById('scoreChip');
   const revealBtn = document.getElementById('revealBtn');
@@ -1244,6 +1267,7 @@ function setName(){
   if(n && n.trim()){ playerName = n.trim(); store.set("ncaaName", playerName); render(); }
 }
 async function submitMine(){
+  if(tourneyLocked()){ toast('Brackets are locked — the tournament has started'); return; }
   if(picksMade()<15) return;
   if(!playerName){ setName(); if(!playerName) return; }
   await Backend.submit({ name:playerName, picks:{...picks}, submittedAt:Date.now() });
