@@ -244,6 +244,8 @@ let revealed = false;
 let mobileRound = 1;
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
+let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
+let lbPolling = false;
 const mq = window.matchMedia('(max-width: 720px)');
 let isMobile = mq.matches;
 
@@ -387,13 +389,19 @@ function renderBracketView(){
   renderChrome();
 }
 
-async function renderLeaderboard(){
-  poolCache = await Backend.getAll();
+async function renderLeaderboard(opts){
+  opts = opts || {};
+  if(!opts.fromCache) poolCache = await Backend.getAll();
   const actualChamp = actualWinnerSeo(401);
   const scored = poolCache.map(e=>({
     name:e.name, picks:e.picks, submittedAt:e.submittedAt||0,
     correct:scoreEntry(e.picks), champSeo:e.picks[401]
   })).sort((a,b)=> b.correct-a.correct || a.submittedAt-b.submittedAt);
+
+  // on auto-refresh, skip the DOM update when nothing changed (no flicker / scroll jump)
+  const sig = scored.map(e=>e.name+':'+e.correct+':'+e.champSeo).join('|') + '|n=' + scored.length;
+  if(opts.onlyIfChanged && sig===lastLbSig) return;
+  lastLbSig = sig;
 
   let rows;
   if(!scored.length){
@@ -423,11 +431,18 @@ async function renderLeaderboard(){
        <button class="btn" onclick="addDemoFriends()">➕ Add demo friends</button>
        <button class="btn ghost" onclick="clearPool()">Clear pool</button>
      </div>`;
-  const liveNote = REMOTE ? `<div class="lbactions"><span style="color:var(--muted);font-size:12px">🔗 Live pool · share this app with friends to fill the board</span></div>` : '';
+  const liveNote = REMOTE ? `<div class="lbactions"><span style="color:var(--muted);font-size:12px">🔄 Auto-updating every 25s · share this link with friends to fill the board</span></div>` : '';
   document.getElementById('mount').innerHTML =
     `<div class="lbhead">Standings · scored live vs the real 2026 results &nbsp;·&nbsp; champ = <b>${teamBySeo(actualChamp).nameShort}</b></div>
      ${rows}
      ${devActions}${liveNote}`;
+  renderNav();
+}
+
+async function pollLeaderboard(){
+  if(currentView!=='leaderboard' || lbPolling) return;
+  lbPolling = true;
+  try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; }
 }
 
 function renderChampBanner(slots){
@@ -559,6 +574,8 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
 });
 mq.addEventListener('change', e=>{ isMobile = e.matches; render(); });
 window.addEventListener('resize', syncAppbarH);
+
+setInterval(pollLeaderboard, 25000);   // auto-refresh the live board while it's open
 
 (async function init(){ poolCache = await Backend.getAll(); render(); })();
 </script>
