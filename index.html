@@ -145,7 +145,9 @@ body{padding:0 0 90px}
 .nhl-logo{flex:none;width:18px;height:18px;object-fit:contain}
 .nhl-nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nhl-pos{flex:none;font-size:9px;color:var(--muted);font-weight:700}
+.nhl-right{flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:5px}
 .nhl-tag{flex:none;margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.2px;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.nhl-right .nhl-tag{margin-left:0}
 .nhl-tag.draft{background:rgba(34,197,94,0.15);color:var(--win);border:1px solid rgba(34,197,94,0.3)}
 .nhl-tag.prospect{background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3)}
 
@@ -726,7 +728,7 @@ function teamNhlPanelHTML(pos, seo){
   const r = teamNhl(seo);
   if(!r || (!r.drafted.length && !r.prospects.length))
     return `<div class="nhlpanel"><div class="boxpanel-msg">No drafted players or top-64 prospects on this roster.</div></div>`;
-  const dr = r.drafted.map(p=>`<div class="nhlrow"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nhl-em',textContent:'🏒'}))"><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></div>`).join('');
+  const dr = r.drafted.map(p=>`<div class="nhlrow"><span class="nhl-em">🏒</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-right"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.style.display='none'"><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></span></div>`).join('');
   const pr = r.prospects.map(p=>`<div class="nhlrow"><span class="nhl-em">📋</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
   return `<div class="nhlpanel">
     ${dr ? `<div class="nhl-sec">NHL drafted</div>${dr}` : ''}
