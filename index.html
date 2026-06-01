@@ -119,7 +119,8 @@ body{padding:0 0 90px}
 /* ---------- leaderboard ---------- */
 .lbhead{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center;margin:6px 16px 12px}
 .lbhead b{color:var(--win)}
-.lbrow{display:flex;align-items:center;gap:11px;margin:0 14px 9px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:13px}
+.lbrow{display:flex;align-items:center;gap:11px;margin:0 14px 9px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:13px;cursor:pointer}
+.lbrow:active{background:var(--surface2)}
 .lbrow.you{border-color:var(--accent);background:linear-gradient(90deg,rgba(59,130,246,0.12),var(--surface))}
 .lbrank{font-size:21px;width:30px;text-align:center;flex:none}
 .lbrank .rk{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;color:var(--muted)}
@@ -160,6 +161,35 @@ body{padding:0 0 90px}
 .cr .cs{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--muted);flex:none;min-width:46px;text-align:center}
 .cr .cs i{font-style:normal;opacity:.5;margin:0 1px}
 
+/* ---------- full bracket overlay ---------- */
+.fbov{position:fixed;inset:0;z-index:100;background:rgba(7,10,17,0.98);display:flex;flex-direction:column;animation:fbfade .15s ease}
+@keyframes fbfade{from{opacity:0}to{opacity:1}}
+.fbov-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)}
+.fbov-close{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer}
+.fbov-title{flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:19px;letter-spacing:0.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbov-toggle{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:3px;flex:none}
+.fbov-toggle button{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.3px;padding:5px 9px;border:none;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.fbov-toggle button.on{background:var(--accent);color:#fff}
+.fbov-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex}
+.fbov-foot{padding:9px 14px 14px;text-align:center;color:var(--muted);font-size:11px}
+.fb-bracket{display:flex;gap:5px;align-items:stretch;min-width:max-content;margin:auto;padding:14px 10px}
+.fb-col{display:flex;flex-direction:column;justify-content:space-around;gap:7px}
+.fb-match{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:7px;overflow:hidden;width:48px;flex:none}
+.fb-team{display:flex;align-items:center;justify-content:center;gap:2px;padding:4px 3px;min-height:27px}
+.fb-team + .fb-team{border-top:1px solid var(--border)}
+.fb-team img{width:20px;height:20px;object-fit:contain;flex:none}
+.fb-team.fb-win{background:linear-gradient(90deg,rgba(34,197,94,0.20),transparent)}
+.fb-team.empty{opacity:.25}
+.fb-seed{font-size:8px;color:var(--muted);font-weight:700;min-width:7px;text-align:center}
+.fb-sc{font-size:11px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--muted);min-width:8px;text-align:center}
+.fb-team.fb-win .fb-sc{color:var(--win)}
+.fb-center{justify-content:center;gap:10px}
+.fb-champ{text-align:center;padding:4px}
+.fb-champ img{width:42px;height:42px;object-fit:contain}
+.fb-champ-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;margin-top:3px;line-height:1}
+.fb-champ-lbl{font-size:9px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+.fb-center .fb-match{width:56px;border-color:rgba(251,191,36,0.45)}
+
 .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:16px 16px 0;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
 .legend i{font-style:normal;font-size:13px}
@@ -181,6 +211,7 @@ body{padding:0 0 90px}
 <div id="bracketChrome">
   <div class="toolbar">
     <button class="btn primary" id="revealBtn" disabled>🔓 Reveal &amp; Score</button>
+    <button class="btn ghost" onclick="openMyBracket()">🗺️ Full bracket</button>
     <button class="btn ghost" id="resetBtn">↺ Reset</button>
     <span class="scorechip" id="scoreChip">0/15 picked</span>
   </div>
@@ -324,6 +355,7 @@ const CONF_2026 = [
 let revealed = false;
 let mobileRound = 1;
 let expandedConfs = {};
+let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
 let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
@@ -479,6 +511,7 @@ async function renderLeaderboard(opts){
     name:e.name, picks:e.picks, submittedAt:e.submittedAt||0,
     correct:scoreEntry(e.picks), champSeo:e.picks[401]
   })).sort((a,b)=> b.correct-a.correct || a.submittedAt-b.submittedAt);
+  _lbScored = scored;
 
   // on auto-refresh, skip the DOM update when nothing changed (no flicker / scroll jump)
   const sig = scored.map(e=>e.name+':'+e.correct+':'+e.champSeo).join('|') + '|n=' + scored.length;
@@ -497,7 +530,7 @@ async function renderLeaderboard(opts){
       const logo = ct.logoUrl ? `<img src="${NCAA_IMG+ct.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
       const tag = champOk ? `<span class="ok">&#10003;</span>` : `<span class="no">busted</span>`;
       const rmini = ROUNDS.map(R=>`${R.short} ${R.positions.filter(p=>e.picks[p]===actualWinnerSeo(p)).length}/${R.positions.length}`).join(' &nbsp;·&nbsp; ');
-      return `<div class="lbrow ${isYou?'you':''}">
+      return `<div class="lbrow ${isYou?'you':''}" onclick="viewEntry(${i})">
         <div class="lbrank">${medal}</div>
         <div class="lbmain">
           <div class="lbname">${e.name}${isYou?' <span class="youtag">you</span>':''}</div>
@@ -526,6 +559,67 @@ async function pollLeaderboard(){
   lbPolling = true;
   try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; }
 }
+
+/* ---------- full bracket overlay (converging 16-team diagram) ---------- */
+function fbTeam(team, winnerSeo, mode){
+  if(!team || !team.seoname) return `<div class="fb-team empty"><span class="fb-seed"></span><span class="fb-sc"></span></div>`;
+  const win = team.seoname===winnerSeo;
+  const logo = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
+  const seed = team.seed ? `<span class="fb-seed">${team.seed}</span>` : '<span class="fb-seed"></span>';
+  const sc = (mode==='results' && team.score!=null && team.score!=='') ? team.score : '';
+  return `<div class="fb-team ${win?'fb-win':''}">${seed}${logo}<span class="fb-sc">${sc}</span></div>`;
+}
+function fbMatch(pos, slots, picks, mode){
+  let top, bot, winnerSeo;
+  if(mode==='results'){
+    const g = BYPOS[pos];
+    top = g.teams.find(t=>t.isTop); bot = g.teams.find(t=>!t.isTop);
+    const w = g.teams.find(t=>t.isWinner); winnerSeo = w ? w.seoname : null;
+  } else {
+    top = slots[pos] ? slots[pos].Top : null;
+    bot = slots[pos] ? slots[pos].Bottom : null;
+    winnerSeo = picks[pos];
+  }
+  return `<div class="fb-match">${fbTeam(top,winnerSeo,mode)}${fbTeam(bot,winnerSeo,mode)}</div>`;
+}
+function buildFullBracket(picks, mode){
+  const slots = (mode==='results') ? null : buildSlotsFor(Object.assign({}, picks), false);
+  const col = (ps)=>`<div class="fb-col">${ps.map(p=>fbMatch(p,slots,picks,mode)).join('')}</div>`;
+  const champSeo = (mode==='results') ? actualWinnerSeo(401) : picks[401];
+  const champ = champSeo ? teamBySeo(champSeo) : null;
+  const champBlock = champ
+    ? `<div class="fb-champ"><img src="${NCAA_IMG+champ.logoUrl}" alt="" onerror="this.style.visibility='hidden'"><div class="fb-champ-name">${champ.nameShort}</div><div class="fb-champ-lbl">🏆 ${mode==='results'?'Champion':'Pick to win'}</div></div>`
+    : `<div class="fb-champ"><div style="font-size:26px;opacity:.4">🏆</div><div class="fb-champ-lbl" style="color:var(--muted)">TBD</div></div>`;
+  return `<div class="fb-bracket">
+    ${col([101,102,103,104])}${col([201,202])}${col([301])}
+    <div class="fb-col fb-center">${champBlock}${fbMatch(401,slots,picks,mode)}</div>
+    ${col([302])}${col([203,204])}${col([105,106,107,108])}
+  </div>`;
+}
+function showBracketOverlay(picks, title, mode){ _ovPicks = picks || {}; _ovTitle = title || 'Bracket'; _ovMode = mode || 'picks'; renderBracketOverlay(); }
+function setOvMode(m){ _ovMode = m; renderBracketOverlay(); }
+function closeBracketOverlay(){ const o = document.getElementById('fbov'); if(o) o.remove(); }
+function renderBracketOverlay(){
+  let o = document.getElementById('fbov');
+  if(!o){ o = document.createElement('div'); o.id = 'fbov'; o.className = 'fbov'; document.body.appendChild(o); }
+  const body = buildFullBracket(_ovMode==='results' ? {} : _ovPicks, _ovMode);
+  const foot = _ovMode==='results'
+    ? 'The real 2026 tournament · green = winner of each game'
+    : 'Predicted bracket · green = picked to advance · tap Results to compare';
+  o.innerHTML =
+    `<div class="fbov-head">
+       <button class="fbov-close" onclick="closeBracketOverlay()">&#10005;</button>
+       <div class="fbov-title">${_ovMode==='results' ? 'Actual Results · 2026' : _ovTitle}</div>
+       <div class="fbov-toggle">
+         <button class="${_ovMode!=='results'?'on':''}" onclick="setOvMode('picks')">Bracket</button>
+         <button class="${_ovMode==='results'?'on':''}" onclick="setOvMode('results')">Results</button>
+       </div>
+     </div>
+     <div class="fbov-body">${body}</div>
+     <div class="fbov-foot">${foot}</div>`;
+}
+function openMyBracket(){ showBracketOverlay(Object.assign({}, picks), 'Your Bracket', picksMade()>0 ? 'picks' : 'results'); }
+function viewEntry(i){ const e = _lbScored[i]; if(e) showBracketOverlay(e.picks, e.name + "'s Bracket", 'picks'); }
 
 /* ---------- conferences view ---------- */
 function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
