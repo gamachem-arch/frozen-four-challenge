@@ -190,6 +190,16 @@ body{padding:0 0 90px}
 .fb-champ-lbl{font-size:9px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
 .fb-center .fb-match{width:56px;border-color:rgba(251,191,36,0.45)}
 
+/* ---------- full-screen pickable bracket (View all) ---------- */
+.pkall{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column;animation:fbfade .15s ease}
+.pkall-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)}
+.pkall-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:center}
+.pkall-body .bracket-scroll{width:100%}
+.pkall-body .bracket{margin:auto}
+.pkall-foot{border-top:1px solid var(--border);padding-bottom:6px}
+.mtab-all{border-color:var(--accent)!important;color:var(--accent)!important;flex:0 0 auto!important;min-width:50px!important}
+.lbview{flex:none;font-size:15px;opacity:.55;padding-left:2px}
+
 .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:16px 16px 0;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
 .legend i{font-style:normal;font-size:13px}
@@ -211,7 +221,7 @@ body{padding:0 0 90px}
 <div id="bracketChrome">
   <div class="toolbar">
     <button class="btn primary" id="revealBtn" disabled>🔓 Reveal &amp; Score</button>
-    <button class="btn ghost" onclick="openMyBracket()">🗺️ Full bracket</button>
+    <button class="btn ghost" onclick="showPickAll()">⤢ View all</button>
     <button class="btn ghost" id="resetBtn">↺ Reset</button>
     <span class="scorechip" id="scoreChip">0/15 picked</span>
   </div>
@@ -356,6 +366,7 @@ let revealed = false;
 let mobileRound = 1;
 let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
+let pickAllOpen = false;
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
 let poolCache = [];
 let lastLbSig = "";                    // signature of last-rendered leaderboard (change detection)
@@ -460,7 +471,7 @@ function mobileBracketHTML(slots){
     const n=i+1, total=R.positions.length, done=roundPicked(R)===total;
     const badge = revealed ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
     return `<button class="mtab ${n===mobileRound?'on':''} ${done?'complete':''}" onclick="goRound(${n})">${R.short}<span class="badge">${badge}</span></button>`;
-  }).join('');
+  }).join('') + `<button class="mtab mtab-all" onclick="showPickAll()">&#10530;<span class="badge">all</span></button>`;
   const R = ROUNDS[mobileRound-1];
   const games = R.positions.map(p=>matchCard(p,slots)).join('');
   let nav = '';
@@ -538,6 +549,7 @@ async function renderLeaderboard(opts){
           <div class="lbmini">${rmini}</div>
         </div>
         <div class="lbscore"><b>${e.correct}</b><span>/15</span></div>
+        <div class="lbview">&#10530;</div>
       </div>`;
     }).join('');
   }
@@ -620,6 +632,28 @@ function renderBracketOverlay(){
 }
 function openMyBracket(){ showBracketOverlay(Object.assign({}, picks), 'Your Bracket', picksMade()>0 ? 'picks' : 'results'); }
 function viewEntry(i){ const e = _lbScored[i]; if(e) showBracketOverlay(e.picks, e.name + "'s Bracket", 'picks'); }
+
+/* ---------- full-screen pickable bracket (View all) ---------- */
+function showPickAll(){ pickAllOpen = true; render(); }
+function closePickAll(){ pickAllOpen = false; const o = document.getElementById('pkall'); if(o) o.remove(); }
+function renderPickAll(){
+  let o = document.getElementById('pkall');
+  if(!pickAllOpen){ if(o) o.remove(); return; }
+  if(!o){ o = document.createElement('div'); o.id = 'pkall'; o.className = 'pkall'; document.body.appendChild(o); }
+  const slots = buildSlots();
+  const made = picksMade();
+  const chip = revealed
+    ? `<span class="scorechip good"><b>${correctCount()}</b>/15 correct</span>`
+    : `<span class="scorechip"><b>${made}</b>/15 picked</span>`;
+  o.innerHTML =
+    `<div class="pkall-head">
+       <button class="fbov-close" onclick="closePickAll()">&#10005;</button>
+       <div class="fbov-title">Full Bracket${revealed?' · Results':' · tap to pick'}</div>
+       ${chip}
+     </div>
+     <div class="pkall-body">${desktopBracketHTML(slots)}</div>
+     <div class="pkall-foot">${submitBarHTML()}</div>`;
+}
 
 /* ---------- conferences view ---------- */
 function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
@@ -741,10 +775,11 @@ function render(){
     renderLeaderboard();
   }
   syncAppbarH();
+  renderPickAll();
 }
 
 /* ---------- actions ---------- */
-function go(view){ currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function go(view){ pickAllOpen = false; currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function goRound(n){ mobileRound = Math.max(1,Math.min(4,n)); render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function setName(){
   const n = prompt("Your name for the pool:", playerName || "");
