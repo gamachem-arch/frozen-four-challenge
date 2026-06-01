@@ -151,6 +151,29 @@ body{padding:0 0 90px}
 .nhl-right .nhl-tag{margin-left:0}
 .nhl-tag.draft{background:rgba(34,197,94,0.15);color:var(--win);border:1px solid rgba(34,197,94,0.3)}
 .nhl-tag.prospect{background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3)}
+.nhlrow.tappable{cursor:pointer;border-radius:7px;padding:4px 5px;margin:0 -5px}
+.nhlrow.tappable:active{background:var(--surface2)}
+/* player card bottom sheet */
+.pcsheet{position:fixed;inset:0;z-index:120;background:rgba(5,8,14,0.6);display:flex;align-items:flex-end;animation:fbfade .15s ease}
+.pc-card{width:100%;max-width:520px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-bottom:none;border-radius:20px 20px 0 0;padding:8px 18px 26px;animation:pcup .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes pcup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.pc-grip{width:40px;height:4px;border-radius:2px;background:var(--border);margin:6px auto 14px;cursor:pointer}
+.pc-head{display:flex;gap:14px;align-items:center}
+.pc-shot{width:74px;height:74px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface2);border:2px solid var(--border)}
+.pc-noshot{display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:var(--muted)}
+.pc-id{flex:1;min-width:0}
+.pc-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;line-height:1.05}
+.pc-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted);letter-spacing:0.3px;margin-top:2px}
+.pc-bio{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
+.pc-draft{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;background:linear-gradient(90deg,rgba(34,197,94,0.12),transparent);border:1px solid rgba(34,197,94,0.25);border-radius:11px;font-size:13px}
+.pc-draft img{width:26px;height:26px;object-fit:contain;flex:none}
+.pc-draft.prospect{background:linear-gradient(90deg,rgba(59,130,246,0.12),transparent);border-color:rgba(59,130,246,0.25)}
+.pc-stats-h{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted);margin:16px 0 7px}
+.pc-stats{display:flex;gap:7px}
+.pc-stat{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 4px;text-align:center}
+.pc-stat b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;line-height:1}
+.pc-stat span{font-size:9px;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);font-weight:700}
+.pc-foot{text-align:center;color:var(--loss);font-size:10px;margin-top:16px}
 
 /* ---------- mobile round pager ---------- */
 .mtabs{position:sticky;top:var(--appbar-h);z-index:20;display:flex;gap:6px;padding:8px 12px 10px;margin:0;background:linear-gradient(180deg,var(--bg) 78%,rgba(11,15,23,0));overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -708,8 +731,8 @@ function teamNhl(seo){
   const drafted = [], prospects = [];
   Object.values(roster).forEach(pl=>{
     const k = normName(pl.first+' '+pl.last);
-    if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, ...idx.drafted[k] });
-    else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, ...idx.prospects[k] });
+    if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, seo, stat:pl, ...idx.drafted[k] });
+    else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, num:pl.num, seo, stat:pl, ...idx.prospects[k] });
   });
   drafted.sort((a,b)=> a.yr-b.yr || a.pk-b.pk);
   prospects.sort((a,b)=> a.rank-b.rank);
@@ -730,11 +753,91 @@ function teamNhlPanelHTML(pos, seo){
   if(!r || (!r.drafted.length && !r.prospects.length))
     return `<div class="nhlpanel"><div class="boxpanel-msg">No drafted players or top-64 prospects on this roster.</div></div>`;
   const jersey = n=>(n!=null&&n!=='')?`<span class="nhl-jersey">${n}</span>`:`<span class="nhl-jersey empty"></span>`;
-  const dr = r.drafted.map(p=>`<div class="nhlrow">${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-right"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.style.display='none'"><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></span></div>`).join('');
-  const pr = r.prospects.map(p=>`<div class="nhlrow">${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
+  const tap = (p)=>`onclick="openPlayerCard('${seo}','${(p.name||'').replace(/'/g,"\\'")}')"`;
+  const dr = r.drafted.map(p=>`<div class="nhlrow tappable" ${tap(p)}>${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-right"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.style.display='none'"><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></span></div>`).join('');
+  const pr = r.prospects.map(p=>`<div class="nhlrow tappable" ${tap(p)}>${jersey(p.num)}<span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
   return `<div class="nhlpanel">
     ${dr ? `<div class="nhl-sec">NHL drafted</div>${dr}` : ''}
     ${pr ? `<div class="nhl-sec">${nhlDraft.prospectYear} draft-eligible (top 64)</div>${pr}` : ''}
+  </div>`;
+}
+
+/* ---------- player card (bottom sheet) ---------- */
+let nhlPlayerCache = {};   // normName -> profile | 'loading' | null
+function findRosterPlayer(seo, name){
+  const r = teamRosters[seo]; if(!r) return null;
+  const k = name.toLowerCase().split(' ');
+  return Object.values(r).find(p=>(p.first+' '+p.last).toLowerCase()===name.toLowerCase()) || null;
+}
+function ageFrom(bd){ if(!bd) return null; const b=new Date(bd), n=new Date(); let a=n.getFullYear()-b.getFullYear(); const m=n.getMonth()-b.getMonth(); if(m<0||(m===0&&n.getDate()<b.getDate()))a--; return a; }
+async function openPlayerCard(seo, name){
+  _pcData = { seo, name };
+  renderPlayerCard();   // show immediately with stats/draft we already have
+  const key = normName(name);
+  if(nhlPlayerCache[key]===undefined && REMOTE){
+    nhlPlayerCache[key] = 'loading';
+    try { const r = await fetch(`${APPS_SCRIPT}?action=nhlPlayer&name=${encodeURIComponent(name)}`, {cache:"no-store"}); const d = await r.json(); nhlPlayerCache[key] = (d&&d.ok)?d:null; }
+    catch(e){ nhlPlayerCache[key] = null; }
+    if(_pcData && _pcData.name===name) renderPlayerCard();
+  }
+}
+let _pcData = null;
+function closePlayerCard(){ _pcData=null; const o=document.getElementById('pcsheet'); if(o) o.remove(); }
+function renderPlayerCard(){
+  if(!_pcData) return;
+  const { seo, name } = _pcData;
+  const idx = draftIndex(), k = normName(name);
+  const draft = idx.drafted[k] || null, prospect = !draft ? idx.prospects[k] : null;
+  const stat = findRosterPlayer(seo, name);
+  const prof = nhlPlayerCache[k];
+  const team = teamBySeo(seo);
+
+  // header: headshot (if loaded), name, jersey/pos, college
+  const loading = prof==='loading';
+  const photo = (prof && prof!=='loading' && prof.headshot)
+    ? `<img class="pc-shot" src="${prof.headshot}" alt="" onerror="this.style.display='none'">`
+    : `<div class="pc-shot pc-noshot">${loading?'…':'<span>'+(stat&&stat.num!=null?('#'+stat.num):'🏒')+'</span>'}</div>`;
+  const age = (prof && prof!=='loading' && prof.birthDate) ? ageFrom(prof.birthDate) : null;
+
+  // bio line
+  let bio = '';
+  if(prof && prof!=='loading'){
+    const ht = prof.heightIn ? `${Math.floor(prof.heightIn/12)}'${prof.heightIn%12}"` : '';
+    const wt = prof.weightLb ? `${prof.weightLb} lb` : '';
+    const place = [prof.city, prof.prov||prof.country].filter(Boolean).join(', ');
+    const bits = [ age!=null?`Age ${age}`:'', ht, wt, prof.shoots?`Shoots ${prof.shoots}`:'', place ].filter(Boolean);
+    bio = bits.length ? `<div class="pc-bio">${bits.join(' · ')}</div>` : '';
+  } else if(loading){ bio = `<div class="pc-bio">Loading NHL profile…</div>`; }
+
+  // draft / prospect badge
+  let badge = '';
+  if(draft) badge = `<div class="pc-draft"><img src="${nhlLogo(draft.nhl)}" onerror="this.style.display='none'"><span><b>${draft.nhl}</b> · ${draft.yr} draft · Round ${draft.rd}, #${draft.pk} overall</span></div>`;
+  else if(prospect) badge = `<div class="pc-draft prospect"><span>📋 ${nhlDraft.prospectYear} draft-eligible · ranked #${prospect.rank}</span></div>`;
+
+  // tournament stats
+  let stats = '';
+  if(stat){
+    const isG = (stat.pos||'').toUpperCase().indexOf('G')===0;
+    const cells = isG
+      ? [['GP',stat.gp],['Saves',stat.saves],['GA',stat.ga]]
+      : [['GP',stat.gp],['G',stat.g],['A',stat.a],['Pts',stat.g+stat.a],['SOG',stat.sog],['+/-',(stat.pm>0?'+':'')+stat.pm]];
+    stats = `<div class="pc-stats-h">Tournament</div><div class="pc-stats">${cells.map(c=>`<div class="pc-stat"><b>${c[1]}</b><span>${c[0]}</span></div>`).join('')}</div>`;
+  }
+
+  let o = document.getElementById('pcsheet');
+  if(!o){ o=document.createElement('div'); o.id='pcsheet'; o.className='pcsheet'; o.onclick=(e)=>{ if(e.target===o) closePlayerCard(); }; document.body.appendChild(o); }
+  o.innerHTML = `<div class="pc-card">
+    <div class="pc-grip" onclick="closePlayerCard()"></div>
+    <div class="pc-head">
+      ${photo}
+      <div class="pc-id">
+        <div class="pc-name">${name}</div>
+        <div class="pc-sub">${stat&&stat.num!=null?'#'+stat.num+' · ':''}${(stat&&stat.pos)||draft&&draft.pos||''} · ${team.nameShort}</div>
+        ${bio}
+      </div>
+    </div>
+    ${badge}${stats}
+    <div class="pc-foot">${draft?'NHL profile via nhle.com':'College player'}</div>
   </div>`;
 }
 
@@ -1207,10 +1310,17 @@ function boxStats(box){
   box.teamBoxscore.forEach(tb=>{
     const t = meta[String(tb.teamId)]; if(!t) return;
     // merge this game's dressed players into the team's roster (boxscores only list who played
-    // a given game, so we union across all of a team's games to catch scratches/injuries)
+    // a given game, so we union across all of a team's games to catch scratches/injuries),
+    // and accumulate per-player tournament stat totals for the player card
     if(t.seoname && tb.playerStats && tb.playerStats.length){
       const r = teamRosters[t.seoname] || (teamRosters[t.seoname] = {});
-      tb.playerStats.forEach(p=>{ const k=(p.firstName+'|'+p.lastName).toLowerCase(); if(!r[k]) r[k]={first:p.firstName, last:p.lastName, pos:p.position, num:p.number}; });
+      tb.playerStats.forEach(p=>{
+        const k=(p.firstName+'|'+p.lastName).toLowerCase();
+        const rec = r[k] || (r[k]={first:p.firstName, last:p.lastName, pos:p.position, num:p.number, gp:0, g:0, a:0, sog:0, blk:0, pm:0, saves:0, ga:0});
+        if(!rec.num && p.number) rec.num=p.number;
+        rec.gp++; rec.g+=num(p.goals); rec.a+=num(p.assists); rec.sog+=num(p.shots);
+        rec.blk+=num(p.blk); rec.pm+=num(p.plusminus); rec.saves+=num(p.saves); rec.ga+=num(p.goalsAllowed);
+      });
     }
     const s = tb.teamStats||{};
     out[t.seoname] = {
