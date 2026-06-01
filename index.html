@@ -118,6 +118,14 @@ body{padding:0 0 90px}
 .as-tag{font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold);font-weight:700;flex:none}
 .as-sc{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--muted);flex:none}
 .editlink{color:var(--accent);cursor:pointer;text-decoration:underline;font-weight:700}
+.boxtoggle{text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--accent);padding:7px 4px;border-top:1px solid var(--border);cursor:pointer}
+.boxpanel{border-top:1px solid var(--border);padding:10px 11px 11px;background:var(--bg)}
+.boxpanel-msg{text-align:center;color:var(--muted);font-size:12px;padding:10px}
+.boxpanel-head{display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
+.boxpanel-head b{font-weight:900;font-size:17px}
+.bph-sep{color:var(--muted)}
+.boxpanel .lg-bars{margin-top:9px}
+.boxpanel .lg-goals{margin-top:9px}
 
 /* ---------- mobile round pager ---------- */
 .mtabs{position:sticky;top:var(--appbar-h);z-index:20;display:flex;gap:6px;padding:8px 12px 10px;margin:0;background:linear-gradient(180deg,var(--bg) 78%,rgba(11,15,23,0));overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -449,8 +457,10 @@ let mobileViewAll = false;
 let editingUnlocked = false;   // re-enable editing of an already-submitted bracket
 const LIVE_DEMO_DATE = "2026/03/27";   // off-season fallback (a real tourney day); production uses today
 let liveGames = [];            // scoreboard game objects (tournament only)
-let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore
+let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore ('loading'|null|obj)
 let liveLoading = false;
+let expandedGames = {};        // bracket pos -> inline box score expanded?
+const GAME_IDS = {101:6538217, 102:6538218, 103:6538219, 104:6538220, 105:6538221, 106:6538222, 107:6538223, 108:6538224, 201:6538225, 202:6538226, 203:6538227, 204:6538228, 301:6538229, 302:6538230, 401:6538231};
 let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
@@ -535,6 +545,29 @@ function pickFilterBarHTML(){
 function bracketLocked(){ if(filteredEntry()) return true; return isSubmittedNow() && !editingUnlocked; }
 function showResultsMode(){ if(filteredEntry()) return true; if(editingUnlocked) return false; return revealed || isSubmittedNow(); }
 function gameFinal(pos){ return String((BYPOS[pos]||{}).state||'').toUpperCase()==='F'; }
+function gameLive(pos){ var s=String((BYPOS[pos]||{}).state||'').toLowerCase(); return s==='live'||s==='l'||s==='in_progress'; }
+function toggleGameBox(pos){ expandedGames[pos] = !expandedGames[pos]; if(expandedGames[pos]) ensureBox(pos); render(); }
+async function ensureBox(pos){
+  const gid = GAME_IDS[pos]; if(!gid) return;
+  if(liveBox[gid]!==undefined && liveBox[gid]!=='loading') return;   // already loaded/attempted
+  if(liveBox[gid]==='loading') return;
+  liveBox[gid] = 'loading'; render();
+  const b = await apiGame(gid);
+  liveBox[gid] = boxStats(b);   // object on success, null if unavailable
+  render();
+}
+function boxCardHTML(pos){
+  const gid = GAME_IDS[pos];
+  const stats = gid ? liveBox[gid] : undefined;
+  if(stats==='loading' || stats===undefined) return '<div class="boxpanel"><div class="boxpanel-msg">Loading box score…</div></div>';
+  if(!stats) return '<div class="boxpanel"><div class="boxpanel-msg">Box score not available yet.</div></div>';
+  const teams = BYPOS[pos].teams;
+  const t0 = teams.find(t=>t.isTop) || teams[0], t1 = teams.find(t=>!t.isTop) || teams[1];
+  const a = stats[t0.seoname], h = stats[t1.seoname];
+  if(!a || !h) return '<div class="boxpanel"><div class="boxpanel-msg">Box score not available yet.</div></div>';
+  const hdr = `<div class="boxpanel-head"><span>${t0.nameShort} <b>${t0.score!=null?t0.score:''}</b></span><span class="bph-sep">–</span><span><b>${t1.score!=null?t1.score:''}</b> ${t1.nameShort}</span></div>`;
+  return `<div class="boxpanel">${hdr}${liveStatBars(a,h)}${liveGoals(a,h,t0.nameShort,t1.nameShort)}</div>`;
+}
 function actualWinnerTeam(pos){ return BYPOS[pos].teams.find(t=>t.isWinner) || null; }
 function actualLoserTeam(pos){ return BYPOS[pos].teams.find(t=>!t.isWinner) || null; }
 function unlockEditing(){ editingUnlocked = true; render(); }
@@ -571,7 +604,7 @@ function teamRow(team, pos, ready){
 function matchCard(pos, slots){
   const slot = slots[pos];
   const ready = !!(slot.Top && slot.Bottom);
-  if(showResultsMode() && gameFinal(pos)) return scoredMatchCard(pos, slot);
+  if(showResultsMode() && (gameFinal(pos) || gameLive(pos))) return scoredMatchCard(pos, slot);
   const g = BYPOS[pos];
   const d = g.date ? g.date.slice(0,5) : '';
   const status = !ready ? 'awaiting' : (viewPicks()[pos] ? 'picked' : 'pick one');
@@ -597,11 +630,15 @@ function scoredMatchCard(pos, slot){
       return '<div class="team-row tbd"><span class="seed"></span><span style="width:23px;flex:none"></span><span class="nm">TBD</span><span class="mark"></span></div>';
     }
     const isPick = team.seoname===myPick;
-    const isAW = team.seoname===awSeo;
+    const isAW = awSeo && team.seoname===awSeo;
     let cls = '', mark = '';
-    if(isPick && correct){ cls='correct'; mark='&#10003;'; }
-    else if(isPick && !correct){ cls='wrong struck'; mark='&#10007;'; }
-    if(isAW && !isPick){ cls += ' actualwin'; mark='&#9670;'; }
+    if(!awSeo){                                  // game not decided yet (live) — just show your pick
+      if(isPick){ cls='picked'; mark='&#9679;'; }
+    } else {
+      if(isPick && correct){ cls='correct'; mark='&#10003;'; }
+      else if(isPick && !correct){ cls='wrong struck'; mark='&#10007;'; }
+      if(isAW && !isPick){ cls += ' actualwin'; mark='&#9670;'; }
+    }
     const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
     const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
     const sc = sameMatchup ? `<span class="sc">${scoreFor(team.seoname)}</span>` : '<span class="sc"></span>';
@@ -614,9 +651,15 @@ function scoredMatchCard(pos, slot){
     rows += `<div class="actual-strip"><span class="as-arrow">&#8627;</span>${img}<span class="as-name">${aw.nameShort}</span><span class="as-tag">advanced</span><span class="as-sc">${wsc}&#8211;${lsc}</span></div>`;
   }
   const d = g.date ? g.date.slice(0,5) : '';
+  const status = gameLive(pos) ? '<span class="lg-live" style="padding:2px 7px"><span class="lg-dot"></span>LIVE</span>' : 'FINAL';
+  const open = !!expandedGames[pos];
+  const gid = GAME_IDS[pos];
+  const toggle = gid ? `<div class="boxtoggle" onclick="toggleGameBox(${pos})">${open?'&#9650; hide box score':'&#9660; box score'}</div>` : '';
   return `<div class="match scored ${pos===401?'final-game':''}">
-    <div class="mhead"><span>${d}</span><span>FINAL</span></div>
+    <div class="mhead"><span>${d}</span><span>${status}</span></div>
     ${rows}
+    ${toggle}
+    ${open ? boxCardHTML(pos) : ''}
   </div>`;
 }
 const CUP = `<img class="cup-logo" src="frozen-four.png" alt="Frozen Four" onerror="this.style.display='none'">`;
