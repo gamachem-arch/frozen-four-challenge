@@ -382,11 +382,11 @@ async function apiGetGroup(key){ if(!REMOTE) return null; try { const r = await 
 /* ---- Real 2026 data (from the live API; has actual winners for scoring) ---- */
 const DATA_2026 = {"title":"2026 DI Men's Ice Hockey Championship","year":2026,"games":[{"pos":101,"victorPos":201,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":5,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/b/bentley.70.png","score":1,"seed":null,"nameShort":"Bentley","seoname":"bentley"}]},{"pos":102,"victorPos":201,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"21:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/penn-st.70.png","score":1,"seed":null,"nameShort":"Penn St.","seoname":"penn-st"}]},{"pos":103,"victorPos":202,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"14:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":3,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-st-mankato.70.png","score":1,"seed":null,"nameShort":"Minnesota St.","seoname":"minn-st-mankato"}]},{"pos":104,"victorPos":202,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"18:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":5,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/c/cornell.70.png","score":0,"seed":null,"nameShort":"Cornell","seoname":"cornell"}]},{"pos":105,"victorPos":203,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"13:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":2,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/u/uconn.70.png","score":1,"seed":null,"nameShort":"UConn","seoname":"uconn"}]},{"pos":106,"victorPos":203,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/d/dartmouth.70.png","score":1,"seed":null,"nameShort":"Dartmouth","seoname":"dartmouth"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":5,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":107,"victorPos":204,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"20:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":3,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/merrimack.70.png","score":0,"seed":null,"nameShort":"Merrimack","seoname":"merrimack"}]},{"pos":108,"victorPos":204,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/providence.70.png","score":2,"seed":null,"nameShort":"Providence","seoname":"providence"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":5,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":201,"victorPos":301,"victorSlot":"Top","state":"F","date":"03/29/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":4,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"}]},{"pos":202,"victorPos":301,"victorSlot":"Bottom","state":"F","date":"03/29/2026","time":"15:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":2,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":6,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":203,"victorPos":302,"victorSlot":"Top","state":"F","date":"03/28/2026","time":"16:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":3,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":4,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":204,"victorPos":302,"victorSlot":"Bottom","state":"F","date":"03/28/2026","time":"19:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":5,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":0,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":301,"victorPos":401,"victorSlot":"Top","state":"F","date":"04/09/2026","time":"20:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":3,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":4,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":302,"victorPos":401,"victorSlot":"Bottom","state":"F","date":"04/09/2026","time":"17:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":2,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":1,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"}]},{"pos":401,"victorPos":null,"victorSlot":null,"state":"F","date":"04/11/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":2,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":1,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]}]};
 
-const ACTUAL = DATA_2026;
-const BYPOS = {};
-ACTUAL.games.forEach(g=>BYPOS[g.pos]=g);
-const TEAMS = {};
-ACTUAL.games.forEach(g=>g.teams.forEach(t=>{ if(t.seoname) TEAMS[t.seoname]=t; }));
+// ACTUAL/BYPOS/TEAMS/GAME_IDS start from the embedded 2026 data, then get
+// upgraded to the live bracket feed on load (see applyBracketData / init).
+let ACTUAL = DATA_2026;
+let BYPOS = {};
+let TEAMS = {};
 const ORDER = [101,102,103,104,105,106,107,108,201,202,203,204,301,302,401];
 
 const ROUNDS = [
@@ -460,7 +460,42 @@ let liveGames = [];            // scoreboard game objects (tournament only)
 let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore ('loading'|null|obj)
 let liveLoading = false;
 let expandedGames = {};        // bracket pos -> inline box score expanded?
-const GAME_IDS = {101:6538217, 102:6538218, 103:6538219, 104:6538220, 105:6538221, 106:6538222, 107:6538223, 108:6538224, 201:6538225, 202:6538226, 203:6538227, 204:6538228, 301:6538229, 302:6538230, 401:6538231};
+let GAME_IDS = {101:6538217, 102:6538218, 103:6538219, 104:6538220, 105:6538221, 106:6538222, 107:6538223, 108:6538224, 201:6538225, 202:6538226, 203:6538227, 204:6538228, 301:6538229, 302:6538230, 401:6538231};
+
+/* Rebuild the results/teams/game-id lookups from a bracket dataset (embedded or live). */
+function applyBracketData(data){
+  ACTUAL = data;
+  BYPOS = {}; data.games.forEach(g=>BYPOS[g.pos]=g);
+  TEAMS = {}; data.games.forEach(g=>g.teams.forEach(t=>{ if(t.seoname) TEAMS[t.seoname]=t; }));
+  const ids = {}; data.games.forEach(g=>{ if(g.contestId) ids[g.pos]=g.contestId; });
+  if(Object.keys(ids).length) GAME_IDS = ids;
+}
+/* Parse the live ncaa-api bracket feed into our slim shape; null if not usable yet. */
+function parseLiveBracket(json){
+  try {
+    const champ = json && json.championships && json.championships[0];
+    if(!champ || !champ.games || champ.games.length < ORDER.length) return null;
+    const games = champ.games.map(g=>({
+      pos: g.bracketPositionId, victorPos: g.victorBracketPositionId, victorSlot: g.victorGamePosition,
+      state: g.gameState || '', date: g.startDate || '', time: g.startTime || '', contestId: g.contestId,
+      teams: (g.teams||[]).map(t=>({
+        isTop: !!t.isTop, isWinner: !!t.isWinner, logoUrl: t.logoUrl || '',
+        score: (t.score!=null) ? t.score : null, seed: t.seed || null,
+        nameShort: t.nameShort || t.nameFull || '', seoname: t.seoname || ''
+      }))
+    }));
+    const have = new Set(games.map(g=>g.pos));
+    for(const p of ORDER){ if(!have.has(p)) return null; }
+    return { title: champ.title, year: champ.year, games };
+  } catch(e){ return null; }
+}
+async function fetchLiveBracket(){
+  if(!REMOTE) return null;
+  try { const r = await fetch(`${APPS_SCRIPT}?action=ncaaBracket&year=${YEAR}`, {cache:"no-store"}); return parseLiveBracket(await r.json()); }
+  catch(e){ return null; }
+}
+
+applyBracketData(DATA_2026);   // seed the lookups from embedded data immediately
 let pickFilter = null;   // null = show all players' picks; else a player name to spotlight
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#eab308','#fb7185'];
 let currentView = "bracket";          // 'bracket' | 'leaderboard'
@@ -782,8 +817,16 @@ async function renderLeaderboard(opts){
 
 async function pollLeaderboard(){
   if(lbPolling) return;
-  if(currentView==='leaderboard'){ lbPolling = true; try { await renderLeaderboard({onlyIfChanged:true}); } catch(e){} finally { lbPolling = false; } }
-  else if(currentView==='live'){ lbPolling = true; try { await refreshLive(); } catch(e){} finally { lbPolling = false; } }
+  lbPolling = true;
+  try {
+    // during a live tournament (some games not final), keep bracket results current
+    if(REMOTE && ORDER.some(p=>!gameFinal(p))){
+      const live = await fetchLiveBracket();
+      if(live){ applyBracketData(live); if(currentView==='bracket') render(); }
+    }
+    if(currentView==='leaderboard') await renderLeaderboard({onlyIfChanged:true});
+    else if(currentView==='live') await refreshLive();
+  } catch(e){} finally { lbPolling = false; }
 }
 
 /* ---------- full bracket overlay (converging 16-team diagram) ---------- */
@@ -1259,7 +1302,9 @@ setInterval(pollLeaderboard, 25000);   // auto-refresh the live board while it's
   if(REMOTE && !store.get("ncaaDefReg")){ apiCreateGroup(DEFAULT_GROUP); store.set("ncaaDefReg","1"); }
   await handleGroupHash();              // joining via a #g= share link switches the active group
   poolCache = await Backend.getAll();
-  render();
+  render();                              // instant render off the embedded data
+  const live = await fetchLiveBracket(); // then upgrade results to the live bracket feed (falls back to embedded)
+  if(live){ applyBracketData(live); render(); }
 })();
 </script>
 </body>
