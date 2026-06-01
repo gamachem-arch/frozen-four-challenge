@@ -190,23 +190,25 @@ body{padding:0 0 90px}
 .fbov-toggle button.on{background:var(--accent);color:#fff}
 .fbov-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex}
 .fbov-foot{padding:9px 14px 14px;text-align:center;color:var(--muted);font-size:11px}
-.fb-bracket{display:flex;gap:5px;align-items:stretch;min-width:max-content;margin:auto;padding:14px 10px}
-.fb-col{display:flex;flex-direction:column;justify-content:space-around;gap:7px}
-.fb-match{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:7px;overflow:hidden;width:48px;flex:none}
-.fb-team{display:flex;align-items:center;justify-content:center;gap:2px;padding:4px 3px;min-height:27px}
+.fb-bracket{display:flex;gap:9px;align-items:stretch;align-self:stretch;min-width:max-content;margin:auto;padding:16px 14px}
+.fb-col{display:flex;flex-direction:column;justify-content:space-around;gap:10px;min-width:0}
+.fb-match{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden;width:104px;flex:none}
+.fb-team{display:flex;align-items:center;gap:5px;padding:8px 8px;min-height:36px}
 .fb-team + .fb-team{border-top:1px solid var(--border)}
-.fb-team img{width:20px;height:20px;object-fit:contain;flex:none}
-.fb-team.fb-win{background:linear-gradient(90deg,rgba(34,197,94,0.20),transparent)}
-.fb-team.empty{opacity:.25}
-.fb-seed{font-size:8px;color:var(--muted);font-weight:700;min-width:7px;text-align:center}
-.fb-sc{font-size:11px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--muted);min-width:8px;text-align:center}
+.fb-team img{width:23px;height:23px;object-fit:contain;flex:none}
+.fb-team.fb-win{background:linear-gradient(90deg,rgba(34,197,94,0.22),transparent)}
+.fb-team.fb-win .fb-nm{color:#fff;font-weight:800}
+.fb-team.empty{opacity:.3}
+.fb-seed{font-size:9px;color:var(--muted);font-weight:700;min-width:9px;text-align:center;flex:none}
+.fb-nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1;color:var(--text)}
+.fb-sc{font-size:13px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--muted);min-width:10px;text-align:center;flex:none}
 .fb-team.fb-win .fb-sc{color:var(--win)}
-.fb-center{justify-content:center;gap:10px}
-.fb-champ{text-align:center;padding:4px}
-.fb-champ img{width:42px;height:42px;object-fit:contain}
-.fb-champ-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;margin-top:3px;line-height:1}
-.fb-champ-lbl{font-size:9px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
-.fb-center .fb-match{width:56px;border-color:rgba(251,191,36,0.45)}
+.fb-center{justify-content:center;gap:14px}
+.fb-champ{text-align:center;padding:6px}
+.fb-champ img{width:58px;height:58px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(251,191,36,.25))}
+.fb-champ-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;margin-top:5px;line-height:1}
+.fb-champ-lbl{font-size:10px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-top:3px}
+.fb-center .fb-match{width:118px;border-color:rgba(251,191,36,0.5);box-shadow:0 0 0 1px rgba(251,191,36,0.15)}
 
 /* ---------- view-all toggle (mobile: drop round tabs, show full bracket) ---------- */
 .viewall-bar{display:flex;align-items:center;gap:10px;padding:8px 14px 2px}
@@ -647,12 +649,12 @@ async function pollLeaderboard(){
 
 /* ---------- full bracket overlay (converging 16-team diagram) ---------- */
 function fbTeam(team, winnerSeo, mode){
-  if(!team || !team.seoname) return `<div class="fb-team empty"><span class="fb-seed"></span><span class="fb-sc"></span></div>`;
+  if(!team || !team.seoname) return `<div class="fb-team empty"><span class="fb-seed"></span><span class="fb-nm">—</span></div>`;
   const win = team.seoname===winnerSeo;
-  const logo = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
+  const logo = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
   const seed = team.seed ? `<span class="fb-seed">${team.seed}</span>` : '<span class="fb-seed"></span>';
-  const sc = (mode==='results' && team.score!=null && team.score!=='') ? team.score : '';
-  return `<div class="fb-team ${win?'fb-win':''}">${seed}${logo}<span class="fb-sc">${sc}</span></div>`;
+  const sc = (mode==='results' && team.score!=null && team.score!=='') ? `<span class="fb-sc">${team.score}</span>` : '';
+  return `<div class="fb-team ${win?'fb-win':''}">${seed}${logo}<span class="fb-nm">${team.nameShort}</span>${sc}</div>`;
 }
 function fbMatch(pos, slots, picks, mode){
   let top, bot, winnerSeo;
@@ -689,8 +691,8 @@ function renderBracketOverlay(){
   if(!o){ o = document.createElement('div'); o.id = 'fbov'; o.className = 'fbov'; document.body.appendChild(o); }
   const body = buildFullBracket(_ovMode==='results' ? {} : _ovPicks, _ovMode);
   const foot = _ovMode==='results'
-    ? 'The real 2026 tournament · green = winner of each game'
-    : 'Predicted bracket · green = picked to advance · tap Results to compare';
+    ? '◀ swipe to pan ▶ · the real 2026 tournament · green = winner of each game'
+    : '◀ swipe to pan ▶ · green = picked to advance · tap Results to compare';
   o.innerHTML =
     `<div class="fbov-head">
        <button class="fbov-close" onclick="closeBracketOverlay()">&#10005;</button>
