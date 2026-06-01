@@ -141,7 +141,8 @@ body{padding:0 0 90px}
 .nhlpanel .boxpanel-msg{text-align:center;color:var(--muted);font-size:12px;padding:6px}
 .nhl-sec{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin:7px 0 4px}
 .nhlrow{display:flex;align-items:center;gap:7px;padding:3px 0}
-.nhl-em{flex:none;font-size:12px}
+.nhl-em{flex:none;font-size:12px;width:18px;text-align:center}
+.nhl-logo{flex:none;width:18px;height:18px;object-fit:contain}
 .nhl-nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nhl-pos{flex:none;font-size:9px;color:var(--muted);font-weight:700}
 .nhl-tag{flex:none;margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.2px;padding:2px 7px;border-radius:10px;white-space:nowrap}
@@ -495,7 +496,9 @@ let liveLoading = false;
 let expandedGames = {};        // bracket pos -> inline box score expanded?
 let expandedTeams = {};        // "pos:seo" -> NHL draft/prospect panel expanded?
 let nhlDraft = null;           // { drafted:[{fn,ln,nhl,yr,rd,pk,pos}], prospects:[{fn,ln,rank,pos,cat}] } | 'loading'
-let teamRosters = {};          // seoname -> [{first,last,pos,num}] from boxscores
+let teamRosters = {};          // seoname -> { "first|last": {first,last,pos,num} } merged across all the team's games
+let teamGames = null;          // seoname -> [contestId,...] (which games each team played)
+let rosterLoaded = {};         // seoname -> true once all its games' boxscores have been merged
 let GAME_IDS = {101:6538217, 102:6538218, 103:6538219, 104:6538220, 105:6538221, 106:6538222, 107:6538223, 108:6538224, 201:6538225, 202:6538226, 203:6538227, 204:6538228, 301:6538229, 302:6538230, 401:6538231};
 
 /* Rebuild the results/teams/game-id lookups from a bracket dataset (embedded or live). */
@@ -679,11 +682,28 @@ function draftIndex(){
   _draftIdx = { drafted, prospects, _for:nhlDraft };
   return _draftIdx;
 }
+// which contestIds each team played (so we can merge all their rosters)
+function teamGamesMap(){
+  if(teamGames) return teamGames;
+  teamGames = {};
+  ACTUAL.games.forEach(g=>{ const id=GAME_IDS[g.pos]; if(!id) return; g.teams.forEach(t=>{ if(t.seoname){ (teamGames[t.seoname]=teamGames[t.seoname]||[]).push(id); } }); });
+  return teamGames;
+}
+// load + merge every box score this team appears in, so the roster is complete
+async function ensureFullRoster(seo){
+  if(rosterLoaded[seo]) return;
+  const gids = teamGamesMap()[seo] || [];
+  for(const gid of gids){
+    if(liveBox[gid]===undefined){ liveBox[gid]='loading'; const b=await apiGame(gid); liveBox[gid]=boxStats(b); }
+  }
+  rosterLoaded[seo] = true;
+  render();
+}
 function teamNhl(seo){
   const roster = teamRosters[seo]; if(!roster) return null;
   const idx = draftIndex();
   const drafted = [], prospects = [];
-  roster.forEach(pl=>{
+  Object.values(roster).forEach(pl=>{
     const k = normName(pl.first+' '+pl.last);
     if(idx.drafted[k]) drafted.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.drafted[k] });
     else if(idx.prospects[k]) prospects.push({ name:pl.first+' '+pl.last, pos:pl.pos, ...idx.prospects[k] });
@@ -695,18 +715,18 @@ function teamNhl(seo){
 function toggleTeamNhl(pos, seo){
   const key = pos+':'+seo;
   expandedTeams[key] = !expandedTeams[key];
-  if(expandedTeams[key]){ ensureNhlDraft().then(render); if(!teamRosters[seo]) ensureBox(pos); }
+  if(expandedTeams[key]){ ensureNhlDraft().then(render); ensureFullRoster(seo); }
   render();
 }
+function nhlLogo(ab){ return `https://assets.nhle.com/logos/nhl/svg/${ab}_light.svg`; }
 function teamNhlPanelHTML(pos, seo){
-  if(nhlDraft==='loading' || nhlDraft===null && REMOTE && !teamRosters[seo]) {}
   if(nhlDraft==='loading') return `<div class="nhlpanel"><div class="boxpanel-msg">Loading NHL draft data…</div></div>`;
   if(!nhlDraft) return `<div class="nhlpanel"><div class="boxpanel-msg">NHL draft data unavailable.</div></div>`;
-  if(!teamRosters[seo]) return `<div class="nhlpanel"><div class="boxpanel-msg">Loading roster…</div></div>`;
+  if(!rosterLoaded[seo]) return `<div class="nhlpanel"><div class="boxpanel-msg">Loading roster…</div></div>`;
   const r = teamNhl(seo);
   if(!r || (!r.drafted.length && !r.prospects.length))
     return `<div class="nhlpanel"><div class="boxpanel-msg">No drafted players or top-64 prospects on this roster.</div></div>`;
-  const dr = r.drafted.map(p=>`<div class="nhlrow"><span class="nhl-em">🏒</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></div>`).join('');
+  const dr = r.drafted.map(p=>`<div class="nhlrow"><img class="nhl-logo" src="${nhlLogo(p.nhl)}" alt="${p.nhl}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nhl-em',textContent:'🏒'}))"><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag draft">${p.nhl} · ${p.yr} R${p.rd} #${p.pk}</span></div>`).join('');
   const pr = r.prospects.map(p=>`<div class="nhlrow"><span class="nhl-em">📋</span><span class="nhl-nm">${p.name}</span><span class="nhl-pos">${p.pos||''}</span><span class="nhl-tag prospect">${nhlDraft.prospectYear} prospect · #${p.rank}</span></div>`).join('');
   return `<div class="nhlpanel">
     ${dr ? `<div class="nhl-sec">NHL drafted</div>${dr}` : ''}
@@ -1182,9 +1202,11 @@ function boxStats(box){
   const out = {};
   box.teamBoxscore.forEach(tb=>{
     const t = meta[String(tb.teamId)]; if(!t) return;
-    // stash the roster (names) so the NHL-draft panel can match against it
+    // merge this game's dressed players into the team's roster (boxscores only list who played
+    // a given game, so we union across all of a team's games to catch scratches/injuries)
     if(t.seoname && tb.playerStats && tb.playerStats.length){
-      teamRosters[t.seoname] = tb.playerStats.map(p=>({first:p.firstName, last:p.lastName, pos:p.position, num:p.number}));
+      const r = teamRosters[t.seoname] || (teamRosters[t.seoname] = {});
+      tb.playerStats.forEach(p=>{ const k=(p.firstName+'|'+p.lastName).toLowerCase(); if(!r[k]) r[k]={first:p.firstName, last:p.lastName, pos:p.position, num:p.number}; });
     }
     const s = tb.teamStats||{};
     out[t.seoname] = {
