@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Frozen Four Bracket Challenge — POC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0f17; --surface:#141a26; --surface2:#1b2435; --border:#26304a;
+  --text:#eef2fb; --muted:#8a95ad; --accent:#3b82f6; --win:#22c55e;
+  --gold:#fbbf24; --loss:#5b6680; --red:#ef4444; --appbar-h:120px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif}
+body{padding:0 0 90px}
+
+/* ---------- header ---------- */
+.appbar{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#0b0f17 84%,rgba(11,15,23,0));padding:14px 16px 10px}
+.appbar h1{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;line-height:0.95;margin:0;letter-spacing:0.5px;text-transform:uppercase}
+.appbar h1 .ice{color:var(--accent)}
+.appbar .sub{color:var(--muted);font-size:12px;margin-top:3px;font-weight:500}
+.nav{display:flex;align-items:center;gap:10px;margin-top:11px}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px}
+.tab{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.4px;padding:7px 13px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer}
+.tab.on{background:var(--accent);color:#fff}
+.who{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+
+.btn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.5px;text-transform:uppercase;padding:7px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .1s,background .12s}
+.btn:active{transform:scale(0.96)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:disabled{opacity:0.4;background:var(--surface);border-color:var(--border);color:var(--muted);cursor:not-allowed}
+.btn.ghost{background:transparent}
+.btn.big{width:100%;padding:15px;font-size:17px;border-radius:13px}
+
+/* bracket chrome */
+.toolbar{display:flex;gap:8px;align-items:center;margin:12px 16px 0;flex-wrap:wrap}
+.scorechip{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.5px;padding:6px 13px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.scorechip b{color:var(--text)}
+.scorechip.good b{color:var(--win)}
+.hint{margin:7px 16px 0;color:var(--muted);font-size:12px;line-height:1.45}
+.hint b{color:var(--accent)}
+
+/* ---------- champion banner ---------- */
+.champ-banner{margin:12px 16px 14px;padding:13px 16px;border-radius:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(251,191,36,0.13),rgba(251,191,36,0.03));border:1px solid rgba(251,191,36,0.32)}
+.champ-banner.empty{background:var(--surface);border:1px dashed var(--border)}
+.champ-banner.miss{background:linear-gradient(135deg,rgba(239,68,68,0.12),transparent);border-color:rgba(239,68,68,0.3)}
+.champ-banner img{width:44px;height:44px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+.champ-banner .lbl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.3px;color:var(--gold);text-transform:uppercase}
+.champ-banner.empty .lbl{color:var(--muted)}
+.champ-banner .name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:23px;line-height:1;margin-top:2px}
+.champ-banner .actual{font-size:11px;color:var(--muted);margin-top:3px}
+.champ-banner .actual b{color:var(--gold)}
+.champ-banner .trophy{margin-left:auto;font-size:27px}
+
+/* ---------- desktop horizontal bracket ---------- */
+.bracket-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:0 16px 10px}
+.bracket{display:flex;gap:16px;min-width:max-content;align-items:stretch}
+.round-col{display:flex;flex-direction:column;justify-content:space-around;min-width:184px;gap:13px}
+.round-col.final-col{justify-content:center}
+.round-head{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);text-align:center}
+.round-head .cnt{display:block;font-size:10px;color:var(--loss);font-weight:600;letter-spacing:0.5px}
+.cup-logo{width:50px;display:block;margin:2px auto 4px}
+
+/* ---------- matchup ---------- */
+.match{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;position:relative}
+.match.final-game{border-color:rgba(251,191,36,0.4)}
+.match .mhead{font-size:9px;color:var(--loss);font-weight:600;letter-spacing:0.4px;padding:4px 9px 2px;text-transform:uppercase;display:flex;justify-content:space-between}
+.team-row{display:flex;align-items:center;gap:8px;padding:8px 9px;transition:background .12s}
+.team-row + .team-row{border-top:1px solid var(--border)}
+.team-row.clickable{cursor:pointer}
+.team-row.clickable:active{background:var(--surface2)}
+.team-row img{width:23px;height:23px;object-fit:contain;flex:none}
+.team-row .seed{font-size:9px;color:var(--muted);font-weight:700;width:13px;text-align:center;flex:none}
+.team-row .nm{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.05}
+.team-row .mark{font-size:13px;width:15px;text-align:center;flex:none;color:var(--accent)}
+.team-row .sc{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;min-width:18px;text-align:right;color:var(--muted)}
+.team-row.tbd{cursor:default}
+.team-row.tbd .nm{color:var(--loss);font-style:italic;font-weight:500}
+.team-row.picked{background:linear-gradient(90deg,rgba(59,130,246,0.20),transparent)}
+.team-row.picked .nm{color:#fff;font-weight:700}
+.team-row.correct{background:linear-gradient(90deg,rgba(34,197,94,0.18),transparent)}
+.team-row.correct .nm{color:#fff;font-weight:700}
+.team-row.correct .mark{color:var(--win)}
+.team-row.wrong{background:linear-gradient(90deg,rgba(239,68,68,0.15),transparent)}
+.team-row.wrong .nm{color:#fecaca}
+.team-row.wrong .mark{color:var(--red)}
+.team-row.actualwin .sc{color:var(--gold)}
+.team-row.actualwin .mark{color:var(--gold)}
+
+/* ---------- mobile round pager ---------- */
+.mtabs{position:sticky;top:var(--appbar-h);z-index:20;display:flex;gap:6px;padding:8px 12px 10px;margin:0;background:linear-gradient(180deg,var(--bg) 78%,rgba(11,15,23,0));overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mtab{flex:1 0 auto;min-width:62px;display:flex;flex-direction:column;align-items:center;gap:1px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.6px;padding:7px 8px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:background .12s,transform .1s}
+.mtab:active{transform:scale(0.95)}
+.mtab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.mtab .badge{font-size:10px;font-weight:600;opacity:.85;font-family:'Inter',sans-serif}
+.mtab.complete:not(.on){border-color:var(--win);color:var(--text)}
+.mtab.complete:not(.on) .badge{color:var(--win)}
+.mround{padding:2px 14px 0}
+.mround .round-head{margin-bottom:4px}
+.mgames{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.mround .match{width:100%}
+.mround .team-row{padding:14px 13px}
+.mround .team-row .nm{font-size:17px}
+.mround .team-row img{width:27px;height:27px}
+.mround .team-row .seed{width:16px;font-size:10px}
+.mround .team-row .sc{font-size:18px}
+.nextbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 4px;padding:14px;border-radius:12px;border:1px dashed var(--border);background:var(--surface);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:0.6px;text-transform:uppercase;cursor:pointer}
+.nextbtn.ready{border-style:solid;background:var(--accent);border-color:var(--accent);color:#fff}
+.prevlink{display:block;text-align:center;margin-top:10px;color:var(--muted);font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:0.5px;cursor:pointer}
+
+/* ---------- submit bar ---------- */
+.submitbar{margin:20px 14px 0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.submitnote{color:var(--muted);font-size:12px;text-align:center}
+
+/* ---------- leaderboard ---------- */
+.lbhead{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center;margin:6px 16px 12px}
+.lbhead b{color:var(--win)}
+.lbrow{display:flex;align-items:center;gap:11px;margin:0 14px 9px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:13px}
+.lbrow.you{border-color:var(--accent);background:linear-gradient(90deg,rgba(59,130,246,0.12),var(--surface))}
+.lbrank{font-size:21px;width:30px;text-align:center;flex:none}
+.lbrank .rk{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;color:var(--muted)}
+.lbmain{flex:1;min-width:0}
+.lbname{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;line-height:1.05;display:flex;align-items:center;gap:7px}
+.youtag{font-size:9px;letter-spacing:0.5px;text-transform:uppercase;background:var(--accent);color:#fff;padding:2px 6px;border-radius:10px;font-family:'Inter',sans-serif;font-weight:700}
+.lbchamp{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13px;color:var(--text)}
+.lbchamp img{width:19px;height:19px;object-fit:contain}
+.lbchamp .ok{color:var(--win);font-weight:700}
+.lbchamp .no{color:var(--loss);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;border:1px solid var(--border);padding:1px 5px;border-radius:8px}
+.lbmini{margin-top:5px;font-size:11px;color:var(--muted);letter-spacing:0.2px}
+.lbscore{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;line-height:1;flex:none;text-align:right;color:var(--win)}
+.lbscore span{font-size:12px;color:var(--muted);font-weight:700}
+.empty{margin:34px 26px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
+.lbactions{display:flex;gap:8px;justify-content:center;margin:18px 14px 0;flex-wrap:wrap}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:16px 16px 0;color:var(--muted);font-size:11px}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{font-style:normal;font-size:13px}
+.footnote{color:var(--loss);font-size:11px;text-align:center;margin:18px 16px 0;line-height:1.5}
+.footnote code{background:var(--surface2);padding:1px 5px;border-radius:4px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="appbar" id="appbar">
+  <h1>FROZEN <span class="ice">FOUR</span> CHALLENGE</h1>
+  <div class="sub">NCAA DI Men's Ice Hockey · 2026</div>
+  <div class="nav" id="nav"></div>
+</div>
+
+<div id="bracketChrome">
+  <div class="toolbar">
+    <button class="btn primary" id="revealBtn" disabled>🔓 Reveal &amp; Score</button>
+    <button class="btn ghost" id="resetBtn">↺ Reset</button>
+    <span class="scorechip" id="scoreChip">0/15 picked</span>
+  </div>
+  <div class="hint" id="hint"></div>
+  <div id="champBanner"></div>
+</div>
+
+<div id="mount"></div>
+
+<div class="legend" id="legend"></div>
+<div class="footnote">
+  Bracket + results are the real 2026 tournament, from NCAA.com via the free <code>ncaa-api</code>.
+  This POC stores the pool on your device (<code>localStorage</code>) so you can test multiplayer solo —
+  flip <code>REMOTE=true</code> and everyone's picks sync through your Apps Script + Sheet for one shared live board.
+</div>
+
+<script>
+const NCAA_IMG = "https://www.ncaa.com";
+const YEAR = 2026;
+
+/* localStorage throws in sandboxed preview iframes / private mode — fall back to memory so the app still runs */
+const _mem = {};
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return (k in _mem) ? _mem[k] : null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){ _mem[k]=v; } },
+  remove(k){ try { localStorage.removeItem(k); } catch(e){ delete _mem[k]; } }
+};
+
+/* ====================================================================
+   BACKEND — flip REMOTE=true and paste your Apps Script /exec URL to go
+   from device-local to a real shared pool. See ncaa-appscript.gs for the
+   server. All calls are GET (Apps Script /exec drops POST bodies on its
+   redirect, and GET is CORS-clean from the browser):
+     ?action=getBrackets&pool=POOL_ID    -> { entries:[{name,picks,submittedAt}] }
+     ?action=submitBracket&pool=POOL_ID&entry=<urlencoded JSON entry>
+     ?action=ncaaBracket&year=YYYY       -> live bracket JSON (CORS proxy)
+   ==================================================================== */
+const REMOTE = true;    // <-- live: picks sync through the Apps Script + Sheet
+const POOL_ID = "frozenfour-2026";
+const APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbz7gPRN_7zWzrd51tlyo4_rEeSFX_7I2F_Jop5kojdcLg8X51hFW42Zhb4by7L5JH1PXg/exec";
+const POOL_KEY = "ncaaPool_" + POOL_ID;
+
+const Backend = {
+  async getAll(){
+    if(REMOTE){
+      try {
+        const r = await fetch(`${APPS_SCRIPT}?action=getBrackets&pool=${encodeURIComponent(POOL_ID)}`, {cache:"no-store"});
+        const d = await r.json();
+        return d.entries || [];
+      } catch(e){ console.warn("getBrackets failed", e); return []; }
+    }
+    try { return JSON.parse(store.get(POOL_KEY)) || []; } catch(e){ return []; }
+  },
+  async submit(entry){
+    if(REMOTE){
+      const url = `${APPS_SCRIPT}?action=submitBracket&pool=${encodeURIComponent(POOL_ID)}&entry=${encodeURIComponent(JSON.stringify(entry))}`;
+      try { await fetch(url, {cache:"no-store"}); } catch(e){ console.warn("submitBracket failed", e); }
+      return;
+    }
+    const all = await this.getAll();
+    const i = all.findIndex(e=>e.name.toLowerCase()===entry.name.toLowerCase());
+    if(i>=0) all[i] = entry; else all.push(entry);
+    store.set(POOL_KEY, JSON.stringify(all));
+  },
+  async clear(){
+    if(REMOTE) return;            // (real pool wouldn't expose a wipe)
+    store.remove(POOL_KEY);
+  }
+};
+
+/* ---- Real 2026 data (from the live API; has actual winners for scoring) ---- */
+const DATA_2026 = {"title":"2026 DI Men's Ice Hockey Championship","year":2026,"games":[{"pos":101,"victorPos":201,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":5,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/b/bentley.70.png","score":1,"seed":null,"nameShort":"Bentley","seoname":"bentley"}]},{"pos":102,"victorPos":201,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"21:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/penn-st.70.png","score":1,"seed":null,"nameShort":"Penn St.","seoname":"penn-st"}]},{"pos":103,"victorPos":202,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"14:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":3,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-st-mankato.70.png","score":1,"seed":null,"nameShort":"Minnesota St.","seoname":"minn-st-mankato"}]},{"pos":104,"victorPos":202,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"18:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":5,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/c/cornell.70.png","score":0,"seed":null,"nameShort":"Cornell","seoname":"cornell"}]},{"pos":105,"victorPos":203,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"13:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":2,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/u/uconn.70.png","score":1,"seed":null,"nameShort":"UConn","seoname":"uconn"}]},{"pos":106,"victorPos":203,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/d/dartmouth.70.png","score":1,"seed":null,"nameShort":"Dartmouth","seoname":"dartmouth"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":5,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":107,"victorPos":204,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"20:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":3,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/merrimack.70.png","score":0,"seed":null,"nameShort":"Merrimack","seoname":"merrimack"}]},{"pos":108,"victorPos":204,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/providence.70.png","score":2,"seed":null,"nameShort":"Providence","seoname":"providence"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":5,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":201,"victorPos":301,"victorSlot":"Top","state":"F","date":"03/29/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":4,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"}]},{"pos":202,"victorPos":301,"victorSlot":"Bottom","state":"F","date":"03/29/2026","time":"15:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":2,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":6,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":203,"victorPos":302,"victorSlot":"Top","state":"F","date":"03/28/2026","time":"16:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":3,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":4,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":204,"victorPos":302,"victorSlot":"Bottom","state":"F","date":"03/28/2026","time":"19:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":5,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":0,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":301,"victorPos":401,"victorSlot":"Top","state":"F","date":"04/09/2026","time":"20:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":3,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":4,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":302,"victorPos":401,"victorSlot":"Bottom","state":"F","date":"04/09/2026","time":"17:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":2,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":1,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"}]},{"pos":401,"victorPos":null,"victorSlot":null,"state":"F","date":"04/11/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":2,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":1,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]}]};
+
+const ACTUAL = DATA_2026;
+const BYPOS = {};
+ACTUAL.games.forEach(g=>BYPOS[g.pos]=g);
+const TEAMS = {};
+ACTUAL.games.forEach(g=>g.teams.forEach(t=>{ if(t.seoname) TEAMS[t.seoname]=t; }));
+const ORDER = [101,102,103,104,105,106,107,108,201,202,203,204,301,302,401];
+
+const ROUNDS = [
+  {key:1, short:"R16",   positions:[101,102,103,104,105,106,107,108], title:"Regionals",    sub:"Round of 16"},
+  {key:2, short:"QF",    positions:[201,202,203,204],                 title:"Quarterfinals", sub:"Elite 8"},
+  {key:3, short:"FF",    positions:[301,302],                         title:"Frozen Four",   sub:"Semifinals"},
+  {key:4, short:"FINAL", positions:[401],                             title:"Championship",  sub:"Title Game"},
+];
+
+let revealed = false;
+let mobileRound = 1;
+let currentView = "bracket";          // 'bracket' | 'leaderboard'
+let poolCache = [];
+const mq = window.matchMedia('(max-width: 720px)');
+let isMobile = mq.matches;
+
+const PICKS_KEY = "ncaaPicks_" + YEAR;
+let picks = loadPicks();
+let playerName = store.get("ncaaName") || "";
+
+function loadPicks(){ try { return JSON.parse(store.get(PICKS_KEY)) || {}; } catch(e){ return {}; } }
+function savePicks(){ try { store.set(PICKS_KEY, JSON.stringify(picks)); } catch(e){} }
+function teamBySeo(s){ return TEAMS[s] || {nameShort:"—", logoUrl:""}; }
+
+/* Build the live slot map from a picks dict. R16 seeded from real teams;
+   downstream slots filled by advanced teams. Optionally prunes stale picks. */
+function buildSlotsFor(pk, prune){
+  const slots = {};
+  ACTUAL.games.filter(g=>g.pos<=108).forEach(g=>{
+    slots[g.pos] = { Top:g.teams.find(t=>t.isTop)||null, Bottom:g.teams.find(t=>!t.isTop)||null };
+  });
+  [201,202,203,204,301,302,401].forEach(p=> slots[p] = {Top:null, Bottom:null});
+  ORDER.forEach(pos=>{
+    const slot = slots[pos];
+    if(prune && pk[pos] && !((slot.Top&&slot.Top.seoname===pk[pos])||(slot.Bottom&&slot.Bottom.seoname===pk[pos]))){
+      delete pk[pos];
+    }
+    const seo = pk[pos];
+    const g = BYPOS[pos];
+    if(seo && g.victorPos){
+      const team = (slot.Top&&slot.Top.seoname===seo) ? slot.Top : slot.Bottom;
+      if(team) slots[g.victorPos][g.victorSlot] = team;
+    }
+  });
+  return slots;
+}
+function buildSlots(){ return buildSlotsFor(picks, true); }
+
+function actualWinnerSeo(pos){ const w = BYPOS[pos].teams.find(t=>t.isWinner); return w ? w.seoname : null; }
+function picksMade(){ return ORDER.filter(p=>picks[p]).length; }
+function correctCount(){ return ORDER.filter(p=>picks[p] && picks[p]===actualWinnerSeo(p)).length; }
+function scoreEntry(pk){ return ORDER.filter(p=>pk[p] && pk[p]===actualWinnerSeo(p)).length; }
+function roundPicked(R){ return R.positions.filter(p=>picks[p]).length; }
+function myEntry(){ return playerName ? poolCache.find(e=>e.name.toLowerCase()===playerName.toLowerCase()) : null; }
+
+function pick(pos, seo){
+  if(revealed) return;
+  if(picks[pos]===seo) return;
+  picks[pos] = seo;
+  savePicks();
+  render();
+}
+
+/* ---------- matchup rendering ---------- */
+function teamRow(team, pos, ready){
+  if(!team || !team.nameShort){
+    return '<div class="team-row tbd"><span class="seed"></span><span style="width:23px;flex:none"></span><span class="nm">TBD</span><span class="mark"></span></div>';
+  }
+  const isPicked = picks[pos]===team.seoname;
+  const isActual = revealed ? actualWinnerSeo(pos)===team.seoname : false;
+  let cls = '', mark = '';
+  if(revealed){
+    if(isPicked && isActual){ cls='correct'; mark='&#10003;'; }
+    else if(isPicked && !isActual){ cls='wrong'; mark='&#10007;'; }
+    if(isActual) cls += ' actualwin';
+    if(isActual && !isPicked) mark = '&#9670;';
+  } else if(isPicked){
+    cls='picked'; mark='&#9679;';
+  }
+  const clickable = (!revealed && ready) ? 'clickable' : '';
+  const img = team.logoUrl ? `<img src="${NCAA_IMG+team.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '<span style="width:23px;flex:none"></span>';
+  const seed = team.seed ? `<span class="seed">${team.seed}</span>` : '<span class="seed"></span>';
+  const sc = (revealed && team.score!=null) ? team.score : '';
+  const onclick = clickable ? `onclick="pick(${pos},'${team.seoname}')"` : '';
+  return `<div class="team-row ${cls} ${clickable}" ${onclick}>${seed}${img}<span class="nm">${team.nameShort}</span><span class="mark">${mark}</span><span class="sc">${sc}</span></div>`;
+}
+function matchCard(pos, slots){
+  const slot = slots[pos];
+  const ready = !!(slot.Top && slot.Bottom);
+  const g = BYPOS[pos];
+  const d = g.date ? g.date.slice(0,5) : '';
+  let status = revealed ? 'FINAL' : (!ready ? 'awaiting' : (picks[pos] ? 'picked' : 'pick one'));
+  return `<div class="match ${pos===401?'final-game':''}">
+    <div class="mhead"><span>${d}</span><span>${status}</span></div>
+    ${teamRow(slot.Top, pos, ready)}${teamRow(slot.Bottom, pos, ready)}
+  </div>`;
+}
+const CUP = `<img class="cup-logo" src="https://assets.nhle.com/logos/playoffs/png/scp-20252026-cup.png" alt="" onerror="this.style.display='none'">`;
+
+function desktopBracketHTML(slots){
+  const cols = ROUNDS.map(R=>{
+    const cards = R.positions.map(p=>matchCard(p,slots)).join('');
+    return `<div class="round-col ${R.key===4?'final-col':''}">
+      <div class="round-head">${R.title}<span class="cnt">${R.sub}</span></div>
+      ${R.key===4?CUP:''}${cards}</div>`;
+  }).join('');
+  return `<div class="bracket-scroll"><div class="bracket">${cols}</div></div>`;
+}
+function mobileBracketHTML(slots){
+  const tabs = ROUNDS.map((R,i)=>{
+    const n=i+1, total=R.positions.length, done=roundPicked(R)===total;
+    const badge = revealed ? `${R.positions.filter(p=>picks[p]===actualWinnerSeo(p)).length}/${total}` : `${roundPicked(R)}/${total}`;
+    return `<button class="mtab ${n===mobileRound?'on':''} ${done?'complete':''}" onclick="goRound(${n})">${R.short}<span class="badge">${badge}</span></button>`;
+  }).join('');
+  const R = ROUNDS[mobileRound-1];
+  const games = R.positions.map(p=>matchCard(p,slots)).join('');
+  let nav = '';
+  if(mobileRound<4){
+    const done = roundPicked(R)===R.positions.length;
+    nav += `<button class="nextbtn ${done&&!revealed?'ready':''}" onclick="goRound(${mobileRound+1})">Next: ${ROUNDS[mobileRound].title} →</button>`;
+  }
+  if(mobileRound>1) nav += `<div class="prevlink" onclick="goRound(${mobileRound-1})">← ${ROUNDS[mobileRound-2].title}</div>`;
+  return `<div class="mtabs">${tabs}</div>
+    <div class="mround"><div class="round-head">${R.title}<span class="cnt">${R.sub}</span></div>
+    ${mobileRound===4?CUP:''}<div class="mgames">${games}</div>${nav}</div>`;
+}
+
+/* ---------- submit bar ---------- */
+function submitBarHTML(){
+  const made = picksMade();
+  const entry = myEntry();
+  const isSubmitted = entry && JSON.stringify(entry.picks)===JSON.stringify(picks);
+  let btn, note;
+  if(isSubmitted){
+    btn = `<button class="btn big" onclick="go('leaderboard')">✓ Submitted — view leaderboard →</button>`;
+    note = `Locked in as ${playerName}. Change a pick to re-submit.`;
+  } else if(made<15){
+    btn = `<button class="btn primary big" disabled>✅ Submit my bracket</button>`;
+    note = `${15-made} pick${15-made===1?'':'s'} left before you can submit`;
+  } else {
+    btn = `<button class="btn primary big" onclick="submitMine()">✅ ${entry?'Update':'Submit'} my bracket</button>`;
+    note = playerName ? `Playing as ${playerName} · tap to lock it in` : `We'll ask your name, then lock it in`;
+  }
+  return `<div class="submitbar">${btn}<div class="submitnote">${note}</div></div>`;
+}
+
+/* ---------- views ---------- */
+function renderBracketView(){
+  const slots = buildSlots();
+  savePicks();
+  const inner = isMobile ? mobileBracketHTML(slots) : desktopBracketHTML(slots);
+  document.getElementById('mount').innerHTML = inner + submitBarHTML();
+  renderChampBanner(slots);
+  renderChrome();
+}
+
+async function renderLeaderboard(){
+  poolCache = await Backend.getAll();
+  const actualChamp = actualWinnerSeo(401);
+  const scored = poolCache.map(e=>({
+    name:e.name, picks:e.picks, submittedAt:e.submittedAt||0,
+    correct:scoreEntry(e.picks), champSeo:e.picks[401]
+  })).sort((a,b)=> b.correct-a.correct || a.submittedAt-b.submittedAt);
+
+  let rows;
+  if(!scored.length){
+    rows = `<div class="empty">No brackets in the pool yet.<br>Fill yours and hit <b>Submit</b>, or tap <b>Add demo friends</b> below to see the live leaderboard in action.</div>`;
+  } else {
+    rows = scored.map((e,i)=>{
+      const ct = teamBySeo(e.champSeo);
+      const isYou = playerName && e.name.toLowerCase()===playerName.toLowerCase();
+      const medal = ['🥇','🥈','🥉'][i] || `<span class="rk">${i+1}</span>`;
+      const champOk = e.champSeo===actualChamp;
+      const logo = ct.logoUrl ? `<img src="${NCAA_IMG+ct.logoUrl}" alt="" onerror="this.style.visibility='hidden'">` : '';
+      const tag = champOk ? `<span class="ok">&#10003;</span>` : `<span class="no">busted</span>`;
+      const rmini = ROUNDS.map(R=>`${R.short} ${R.positions.filter(p=>e.picks[p]===actualWinnerSeo(p)).length}/${R.positions.length}`).join(' &nbsp;·&nbsp; ');
+      return `<div class="lbrow ${isYou?'you':''}">
+        <div class="lbrank">${medal}</div>
+        <div class="lbmain">
+          <div class="lbname">${e.name}${isYou?' <span class="youtag">you</span>':''}</div>
+          <div class="lbchamp">🏆 ${logo} ${ct.nameShort} ${tag}</div>
+          <div class="lbmini">${rmini}</div>
+        </div>
+        <div class="lbscore"><b>${e.correct}</b><span>/15</span></div>
+      </div>`;
+    }).join('');
+  }
+  const devActions = REMOTE ? '' :
+    `<div class="lbactions">
+       <button class="btn" onclick="addDemoFriends()">➕ Add demo friends</button>
+       <button class="btn ghost" onclick="clearPool()">Clear pool</button>
+     </div>`;
+  const liveNote = REMOTE ? `<div class="lbactions"><span style="color:var(--muted);font-size:12px">🔗 Live pool · share this app with friends to fill the board</span></div>` : '';
+  document.getElementById('mount').innerHTML =
+    `<div class="lbhead">Standings · scored live vs the real 2026 results &nbsp;·&nbsp; champ = <b>${teamBySeo(actualChamp).nameShort}</b></div>
+     ${rows}
+     ${devActions}${liveNote}`;
+}
+
+function renderChampBanner(slots){
+  const champSeo = picks[401];
+  const champSlot = slots[401];
+  const champTeam = champSeo ? [champSlot.Top,champSlot.Bottom].find(t=>t&&t.seoname===champSeo) : null;
+  const actualChamp = BYPOS[401].teams.find(t=>t.isWinner);
+  const banner = document.getElementById('champBanner');
+  if(!champTeam){
+    banner.innerHTML = `<div class="champ-banner empty">
+      <div class="trophy" style="margin-left:0;opacity:.5">🏆</div>
+      <div><div class="lbl">Your champion</div><div class="name" style="color:var(--muted)">— pick the final —</div></div></div>`;
+    return;
+  }
+  const isRight = champSeo===actualChamp.seoname;
+  const right = (revealed && !isRight)
+    ? `<div style="margin-left:auto;text-align:right"><div class="actual">actual champ<br><b>${actualChamp.nameShort}</b></div></div>`
+    : `<div class="trophy">🏆</div>`;
+  const lbl = revealed ? (isRight ? 'Champion — you nailed it!' : "Your champion — didn't win it") : 'Your champion';
+  banner.innerHTML = `<div class="champ-banner ${revealed&&!isRight?'miss':''}">
+    <img src="${NCAA_IMG+champTeam.logoUrl}" alt="" onerror="this.style.visibility='hidden'">
+    <div><div class="lbl">${lbl}</div><div class="name">${champTeam.nameShort}</div></div>${right}</div>`;
+}
+
+function renderChrome(){
+  const made = picksMade();
+  const chip = document.getElementById('scoreChip');
+  const revealBtn = document.getElementById('revealBtn');
+  if(revealed){
+    const c = correctCount();
+    chip.innerHTML = `<b>${c}</b>/15 correct`; chip.className = 'scorechip good';
+    revealBtn.textContent = '✏️ Back to picks'; revealBtn.disabled = false;
+    document.getElementById('hint').innerHTML = `You scored <b>${c} of 15</b>. ◆ marks games the real winner took from your pick.`;
+    document.getElementById('legend').innerHTML = `<span><i style="color:var(--win)">&#10003;</i> correct</span><span><i style="color:var(--red)">&#10007;</i> wrong</span><span><i style="color:var(--gold)">&#9670;</i> actually won</span>`;
+  } else {
+    chip.innerHTML = `<b>${made}</b>/15 picked`; chip.className = 'scorechip';
+    revealBtn.textContent = '🔓 Reveal & Score'; revealBtn.disabled = made < 15;
+    document.getElementById('hint').innerHTML = made<15
+      ? `Tap a team to advance them — <b>${15-made}</b> game${15-made===1?'':'s'} to go, then submit to the pool.`
+      : `Bracket complete! Submit it below, or 🔓 reveal your own score first.`;
+    document.getElementById('legend').innerHTML = `<span><i style="color:var(--accent)">&#9679;</i> your pick</span><span>tap either team to advance them</span>`;
+  }
+}
+
+function renderNav(){
+  const n = poolCache.length;
+  document.getElementById('nav').innerHTML = `
+    <div class="tabs">
+      <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')">My Bracket</button>
+      <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')">Leaderboard${n?` · ${n}`:''}</button>
+    </div>
+    <button class="who" onclick="setName()">${playerName?'👤 '+playerName:'👤 Set name'}</button>`;
+}
+
+function syncAppbarH(){
+  const h = document.getElementById('appbar').offsetHeight;
+  document.documentElement.style.setProperty('--appbar-h', h + 'px');
+}
+
+function render(){
+  renderNav();
+  const bc = document.getElementById('bracketChrome');
+  if(currentView==='bracket'){
+    bc.style.display = '';
+    renderBracketView();
+  } else {
+    bc.style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    renderLeaderboard();
+  }
+  syncAppbarH();
+}
+
+/* ---------- actions ---------- */
+function go(view){ currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function goRound(n){ mobileRound = Math.max(1,Math.min(4,n)); render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function setName(){
+  const n = prompt("Your name for the pool:", playerName || "");
+  if(n && n.trim()){ playerName = n.trim(); store.set("ncaaName", playerName); render(); }
+}
+async function submitMine(){
+  if(picksMade()<15) return;
+  if(!playerName){ setName(); if(!playerName) return; }
+  await Backend.submit({ name:playerName, picks:{...picks}, submittedAt:Date.now() });
+  poolCache = await Backend.getAll();
+  go('leaderboard');
+}
+
+/* Generate a complete bracket from a chooser(top,bottom,pos)->team, for demo friends */
+function genBracket(chooser){
+  const pk = {};
+  const slots = {};
+  ACTUAL.games.filter(g=>g.pos<=108).forEach(g=>{ slots[g.pos]={Top:g.teams.find(t=>t.isTop),Bottom:g.teams.find(t=>!t.isTop)}; });
+  [201,202,203,204,301,302,401].forEach(p=> slots[p]={Top:null,Bottom:null});
+  for(const pos of ORDER){
+    const s = slots[pos];
+    const w = chooser(s.Top, s.Bottom, pos);
+    pk[pos] = w.seoname;
+    const g = BYPOS[pos];
+    if(g.victorPos) slots[g.victorPos][g.victorSlot] = w;
+  }
+  return pk;
+}
+async function addDemoFriends(){
+  const seeded = (t,b)=> t.seed ? t : (b.seed ? b : t);                         // chalk
+  const ride = (name,fb)=>(t,b)=> [t,b].find(x=>x.seoname===name) || fb(t,b);
+  const demos = [
+    { name:"Chalk Charlie", picks: genBracket(seeded) },
+    { name:"Denver Dan",    picks: genBracket(ride("denver", seeded)) },
+    { name:"Upset Annie",   picks: genBracket(ride("wisconsin", (t,b)=>b)) },   // rides the runner-up, else contrarian
+  ];
+  let i = 0;
+  for(const d of demos){ await Backend.submit({ name:d.name, picks:d.picks, submittedAt:Date.now()+(i++) }); }
+  poolCache = await Backend.getAll();
+  render();
+}
+async function clearPool(){
+  await Backend.clear();
+  poolCache = await Backend.getAll();
+  render();
+}
+
+document.getElementById('revealBtn').addEventListener('click', ()=>{
+  if(!revealed && picksMade()<15) return;
+  revealed = !revealed; render();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  picks = {}; revealed = false; mobileRound = 1; savePicks(); render();
+});
+mq.addEventListener('change', e=>{ isMobile = e.matches; render(); });
+window.addEventListener('resize', syncAppbarH);
+
+(async function init(){ poolCache = await Backend.getAll(); render(); })();
+</script>
+</body>
+</html>
