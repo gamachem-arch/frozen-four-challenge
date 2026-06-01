@@ -28,6 +28,24 @@ body{padding:0 0 90px}
 .tab{flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.3px;padding:8px 6px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
 .tab.on{background:var(--accent);color:#fff}
 .who{flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.groupchip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.groupchip b{font-weight:800;overflow:hidden;text-overflow:ellipsis}
+.gcaret{color:var(--muted);font-size:10px;flex:none}
+/* groups overlay */
+.grp-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 14px 24px}
+.grp-sec{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px}
+.grp-row{display:flex;align-items:center;gap:10px;padding:12px 13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer}
+.grp-row.on{border-color:var(--accent);background:linear-gradient(90deg,rgba(59,130,246,0.10),var(--surface))}
+.grp-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp-active{font-size:9px;letter-spacing:0.5px;text-transform:uppercase;background:var(--accent);color:#fff;padding:2px 6px;border-radius:10px;font-family:'Inter',sans-serif;font-weight:700;flex:none}
+.grp-code{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:0.4px}
+.grp-leave{flex:none;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
+.grp-actions{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.grp-share-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.grp-share-lbl{flex:none;width:40px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)}
+.grp-share-val{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:.2s;z-index:200;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 .btn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.5px;text-transform:uppercase;padding:7px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .1s,background .12s}
 .btn:active{transform:scale(0.96)}
@@ -224,7 +242,7 @@ body{padding:0 0 90px}
     <h1>FROZEN <span class="ice">FOUR</span> CHALLENGE</h1>
     <button class="who" id="whoBtn" onclick="setName()">👤</button>
   </div>
-  <div class="sub">NCAA DI Men's Ice Hockey · 2026</div>
+  <button class="groupchip" onclick="showGroups()">🏒 <b id="groupChipName">Frozen Four 2026</b> <span class="gcaret">&#9662;</span></button>
   <div class="nav" id="nav"></div>
 </div>
 
@@ -270,37 +288,45 @@ const store = {
      ?action=ncaaBracket&year=YYYY       -> live bracket JSON (CORS proxy)
    ==================================================================== */
 const REMOTE = true;    // <-- live: picks sync through the Apps Script + Sheet
-const POOL_ID = "frozenfour-2026";
 const APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbz7gPRN_7zWzrd51tlyo4_rEeSFX_7I2F_Jop5kojdcLg8X51hFW42Zhb4by7L5JH1PXg/exec";
-const POOL_KEY = "ncaaPool_" + POOL_ID;
+
+/* ---- groups (each group = its own pool, identified by id) ---- */
+const DEFAULT_GROUP = { id:"frozenfour-2026", name:"Frozen Four 2026", code:"FROZEN26" };
+function getGroups(){ try { const g = JSON.parse(store.get("ncaaGroups")); return (Array.isArray(g) && g.length) ? g : [DEFAULT_GROUP]; } catch(e){ return [DEFAULT_GROUP]; } }
+function saveGroups(gs){ store.set("ncaaGroups", JSON.stringify(gs)); }
+function activeGroupId(){ return store.get("ncaaActiveGroup") || DEFAULT_GROUP.id; }
+function activeGroup(){ const id = activeGroupId(); return getGroups().find(g=>g.id===id) || getGroups()[0]; }
+function setActiveGroup(id){ store.set("ncaaActiveGroup", id); }
+function poolKey(){ return "ncaaPool_" + activeGroupId(); }
 
 const Backend = {
   async getAll(){
     if(REMOTE){
       try {
-        const r = await fetch(`${APPS_SCRIPT}?action=getBrackets&pool=${encodeURIComponent(POOL_ID)}`, {cache:"no-store"});
+        const r = await fetch(`${APPS_SCRIPT}?action=getBrackets&pool=${encodeURIComponent(activeGroupId())}`, {cache:"no-store"});
         const d = await r.json();
         return d.entries || [];
       } catch(e){ console.warn("getBrackets failed", e); return []; }
     }
-    try { return JSON.parse(store.get(POOL_KEY)) || []; } catch(e){ return []; }
+    try { return JSON.parse(store.get(poolKey())) || []; } catch(e){ return []; }
   },
   async submit(entry){
     if(REMOTE){
-      const url = `${APPS_SCRIPT}?action=submitBracket&pool=${encodeURIComponent(POOL_ID)}&entry=${encodeURIComponent(JSON.stringify(entry))}`;
+      const url = `${APPS_SCRIPT}?action=submitBracket&pool=${encodeURIComponent(activeGroupId())}&entry=${encodeURIComponent(JSON.stringify(entry))}`;
       try { await fetch(url, {cache:"no-store"}); } catch(e){ console.warn("submitBracket failed", e); }
       return;
     }
     const all = await this.getAll();
     const i = all.findIndex(e=>e.name.toLowerCase()===entry.name.toLowerCase());
     if(i>=0) all[i] = entry; else all.push(entry);
-    store.set(POOL_KEY, JSON.stringify(all));
+    store.set(poolKey(), JSON.stringify(all));
   },
-  async clear(){
-    if(REMOTE) return;            // (real pool wouldn't expose a wipe)
-    store.remove(POOL_KEY);
-  }
+  async clear(){ if(REMOTE) return; store.remove(poolKey()); }
 };
+
+/* ---- group registry API (resolve id <-> name <-> code across devices) ---- */
+async function apiCreateGroup(g){ if(!REMOTE) return; try { await fetch(`${APPS_SCRIPT}?action=createGroup&id=${encodeURIComponent(g.id)}&name=${encodeURIComponent(g.name)}&code=${encodeURIComponent(g.code)}`, {cache:"no-store"}); } catch(e){ console.warn("createGroup failed", e); } }
+async function apiGetGroup(key){ if(!REMOTE) return null; try { const r = await fetch(`${APPS_SCRIPT}?action=getGroup&key=${encodeURIComponent(key)}`, {cache:"no-store"}); const d = await r.json(); return d.ok ? d.group : null; } catch(e){ return null; } }
 
 /* ---- Real 2026 data (from the live API; has actual winners for scoring) ---- */
 const DATA_2026 = {"title":"2026 DI Men's Ice Hockey Championship","year":2026,"games":[{"pos":101,"victorPos":201,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":5,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/b/bentley.70.png","score":1,"seed":null,"nameShort":"Bentley","seoname":"bentley"}]},{"pos":102,"victorPos":201,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"21:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/penn-st.70.png","score":1,"seed":null,"nameShort":"Penn St.","seoname":"penn-st"}]},{"pos":103,"victorPos":202,"victorSlot":"Top","state":"F","date":"03/27/2026","time":"14:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":3,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-st-mankato.70.png","score":1,"seed":null,"nameShort":"Minnesota St.","seoname":"minn-st-mankato"}]},{"pos":104,"victorPos":202,"victorSlot":"Bottom","state":"F","date":"03/27/2026","time":"18:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":5,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/c/cornell.70.png","score":0,"seed":null,"nameShort":"Cornell","seoname":"cornell"}]},{"pos":105,"victorPos":203,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"13:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":2,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/u/uconn.70.png","score":1,"seed":null,"nameShort":"UConn","seoname":"uconn"}]},{"pos":106,"victorPos":203,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/d/dartmouth.70.png","score":1,"seed":null,"nameShort":"Dartmouth","seoname":"dartmouth"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":5,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":107,"victorPos":204,"victorSlot":"Top","state":"F","date":"03/26/2026","time":"20:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":3,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/merrimack.70.png","score":0,"seed":null,"nameShort":"Merrimack","seoname":"merrimack"}]},{"pos":108,"victorPos":204,"victorSlot":"Bottom","state":"F","date":"03/26/2026","time":"17:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/p/providence.70.png","score":2,"seed":null,"nameShort":"Providence","seoname":"providence"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":5,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":201,"victorPos":301,"victorSlot":"Top","state":"F","date":"03/29/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":4,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/minn-duluth.70.png","score":3,"seed":null,"nameShort":"Minn. Duluth","seoname":"minn-duluth"}]},{"pos":202,"victorPos":301,"victorSlot":"Bottom","state":"F","date":"03/29/2026","time":"15:00","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/western-mich.70.png","score":2,"seed":4,"nameShort":"Western Mich.","seoname":"western-mich"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":6,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":203,"victorPos":302,"victorSlot":"Top","state":"F","date":"03/28/2026","time":"16:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan-st.70.png","score":3,"seed":3,"nameShort":"Michigan St.","seoname":"michigan-st"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":4,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]},{"pos":204,"victorPos":302,"victorSlot":"Bottom","state":"F","date":"03/28/2026","time":"19:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":5,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/q/quinnipiac.70.png","score":0,"seed":null,"nameShort":"Quinnipiac","seoname":"quinnipiac"}]},{"pos":301,"victorPos":401,"victorSlot":"Top","state":"F","date":"04/09/2026","time":"20:30","teams":[{"isTop":true,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/m/michigan.70.png","score":3,"seed":1,"nameShort":"Michigan","seoname":"michigan"},{"isTop":false,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":4,"seed":null,"nameShort":"Denver","seoname":"denver"}]},{"pos":302,"victorPos":401,"victorSlot":"Bottom","state":"F","date":"04/09/2026","time":"17:00","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":2,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/n/north-dakota.70.png","score":1,"seed":2,"nameShort":"North Dakota","seoname":"north-dakota"}]},{"pos":401,"victorPos":null,"victorSlot":null,"state":"F","date":"04/11/2026","time":"17:30","teams":[{"isTop":true,"isWinner":true,"logoUrl":"/sites/default/files/images/logos/schools/d/denver.70.png","score":2,"seed":null,"nameShort":"Denver","seoname":"denver"},{"isTop":false,"isWinner":false,"logoUrl":"/sites/default/files/images/logos/schools/w/wisconsin.70.png","score":1,"seed":null,"nameShort":"Wisconsin","seoname":"wisconsin"}]}]};
@@ -696,6 +722,99 @@ function renderPickAll(){
      <div class="pkall-foot">${submitBarHTML()}</div>`;
 }
 
+/* ---------- groups (create / join / switch / share) ---------- */
+function slugify(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,20) || 'group'; }
+function rand4(){ const c='abcdefghjkmnpqrstuvwxyz23456789'; let s=''; for(let i=0;i<4;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function prettify(id){ return id.replace(/-[a-z0-9]{4}$/,'').replace(/-/g,' ').replace(/\b\w/g,m=>m.toUpperCase()) || id; }
+function groupLink(g){ return location.origin + location.pathname + "#g=" + encodeURIComponent(g.id); }
+function toast(msg){
+  let t = document.getElementById('toast');
+  if(!t){ t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window.__toastT); window.__toastT = setTimeout(()=>t.classList.remove('show'), 1500);
+}
+function copyText(t){ try { navigator.clipboard.writeText(t); toast('Copied!'); } catch(e){ toast('Copy failed'); } }
+
+async function createGroupFlow(){
+  const name = prompt("Name your group (e.g. Work Pool):");
+  if(!name || !name.trim()) return;
+  const nm = name.trim();
+  const g = { id: slugify(nm) + "-" + rand4(), name: nm, code: ((slugify(nm).replace(/-/g,'').slice(0,4).toUpperCase()) || "GRP") + rand4().toUpperCase() };
+  const gs = getGroups(); gs.push(g); saveGroups(gs); setActiveGroup(g.id);
+  await apiCreateGroup(g);
+  pickFilter = null; poolCache = await Backend.getAll();
+  renderGroups(); render();
+  toast('Created “' + g.name + '”');
+}
+async function joinGroupFlow(){
+  const input = prompt("Paste a group link, or enter a join code:");
+  if(!input || !input.trim()) return;
+  await joinByKey(input.trim(), false);
+}
+async function joinByKey(raw, silent){
+  let key = raw; const m = raw.match(/#g=([^&]+)/); if(m) key = decodeURIComponent(m[1]); key = key.trim();
+  if(!key) return;
+  let g = await apiGetGroup(key);
+  if(!g){
+    // id-shaped keys (from share links, always hyphenated) can join directly; bare codes need the registry
+    if(/^[a-z0-9]+(?:-[a-z0-9]+)+$/i.test(key)){ g = { id:key.toLowerCase(), name:prettify(key.toLowerCase()), code:key.toUpperCase() }; }
+    else { alert("Couldn't find that group. Double-check the code, or use the share link."); return; }
+  }
+  const gs = getGroups(); if(!gs.find(x=>x.id===g.id)){ gs.push(g); saveGroups(gs); }
+  setActiveGroup(g.id); pickFilter = null;
+  if(silent){ toast('Joined “' + g.name + '”'); return; }
+  poolCache = await Backend.getAll();
+  renderGroups(); render();
+  toast('Joined “' + g.name + '”');
+}
+function switchGroup(id){ setActiveGroup(id); pickFilter = null; closeGroups(); (async()=>{ poolCache = await Backend.getAll(); render(); toast('Switched to “' + activeGroup().name + '”'); })(); }
+function leaveGroup(id){
+  let gs = getGroups().filter(g=>g.id!==id);
+  if(!gs.length) gs = [DEFAULT_GROUP];
+  saveGroups(gs);
+  if(activeGroupId()===id) setActiveGroup(gs[0].id);
+  (async()=>{ poolCache = await Backend.getAll(); renderGroups(); render(); })();
+}
+function showGroups(){ renderGroups(); }
+function closeGroups(){ const o = document.getElementById('grpov'); if(o) o.remove(); }
+function renderGroups(){
+  let o = document.getElementById('grpov');
+  if(!o){ o = document.createElement('div'); o.id='grpov'; o.className='fbov'; document.body.appendChild(o); }
+  const gs = getGroups(), act = activeGroupId(), a = activeGroup(), link = groupLink(a);
+  const list = gs.map(g=>{
+    const on = g.id===act;
+    const leave = g.id===DEFAULT_GROUP.id ? '' : `<button class="grp-leave" onclick="event.stopPropagation();leaveGroup('${g.id}')">leave</button>`;
+    return `<div class="grp-row ${on?'on':''}" onclick="switchGroup('${g.id}')">
+      <div style="flex:1;min-width:0">
+        <div class="grp-name">${g.name}${on?' <span class="grp-active">active</span>':''}</div>
+        <div class="grp-code">join code · ${g.code||'—'}</div>
+      </div>${leave}
+    </div>`;
+  }).join('');
+  o.innerHTML =
+    `<div class="fbov-head">
+       <button class="fbov-close" onclick="closeGroups()">&#10005;</button>
+       <div class="fbov-title">Groups</div>
+     </div>
+     <div class="grp-body">
+       <div class="grp-sec">Your groups</div>
+       ${list}
+       <div class="grp-actions">
+         <button class="btn primary big" onclick="createGroupFlow()">➕ Create a new group</button>
+         <button class="btn big" onclick="joinGroupFlow()">🔗 Join with link or code</button>
+       </div>
+       <div class="grp-sec">Invite friends to “${a.name}”</div>
+       <div class="grp-share-row"><span class="grp-share-lbl">Link</span><code class="grp-share-val">${link}</code><button class="btn" onclick="copyText('${link}')">Copy</button></div>
+       <div class="grp-share-row"><span class="grp-share-lbl">Code</span><code class="grp-share-val">${a.code||'—'}</code><button class="btn" onclick="copyText('${a.code||''}')">Copy</button></div>
+     </div>`;
+}
+async function handleGroupHash(){
+  const m = location.hash.match(/#g=([^&]+)/);
+  if(!m) return;
+  await joinByKey(decodeURIComponent(m[1]), true);
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+}
+
 /* ---------- conferences view ---------- */
 function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
 function fmtMD(d){ const mo={"01":"Jan","02":"Feb","03":"Mar","04":"Apr"}; const p=d.split("/"); return (mo[p[0]]||p[0])+" "+parseInt(p[1],10); }
@@ -793,6 +912,8 @@ function renderNav(){
     </div>`;
   const w = document.getElementById('whoBtn');
   if(w) w.textContent = playerName ? '👤 '+playerName : '👤 Set name';
+  const gc = document.getElementById('groupChipName');
+  if(gc) gc.textContent = activeGroup().name;
 }
 
 function syncAppbarH(){
@@ -880,7 +1001,12 @@ window.addEventListener('resize', syncAppbarH);
 
 setInterval(pollLeaderboard, 25000);   // auto-refresh the live board while it's open
 
-(async function init(){ poolCache = await Backend.getAll(); render(); })();
+(async function init(){
+  if(REMOTE && !store.get("ncaaDefReg")){ apiCreateGroup(DEFAULT_GROUP); store.set("ncaaDefReg","1"); }
+  await handleGroupHash();              // joining via a #g= share link switches the active group
+  poolCache = await Backend.getAll();
+  render();
+})();
 </script>
 </body>
 </html>
