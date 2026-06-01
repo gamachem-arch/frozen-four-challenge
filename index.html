@@ -354,6 +354,11 @@ const APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbz7gPRN_7zWzrd51tly
 // Bracket lock: 'open' = always editable (good for off-season pick-em); 'auto' = lock at first
 // puck-drop (earliest game start from the live feed) — the real tournament behavior; 'locked' = force-lock.
 const LOCK_MODE = "open";
+// Scoring scheme (keep the same for everyone in a pool so leaderboards match):
+//   'classic' = escalating 1/2/4/8 per round (champion worth most, max 32)
+//   'flat'    = 1 pt per correct pick (max 15)
+//   'upset'   = classic + 1 bonus pt when your correct pick was the lower seed
+const SCORING = "classic";
 
 /* ---- groups (each group = its own pool, identified by id) ---- */
 const DEFAULT_GROUP = { id:"frozenfour-2026", name:"Frozen Four 2026", code:"FROZEN26" };
@@ -555,8 +560,27 @@ function buildSlots(){ const f = filteredEntry(); return f ? buildSlotsFor(Objec
 
 function actualWinnerSeo(pos){ const w = BYPOS[pos].teams.find(t=>t.isWinner); return w ? w.seoname : null; }
 function picksMade(){ return ORDER.filter(p=>picks[p]).length; }
-function correctCount(){ return ORDER.filter(p=>picks[p] && picks[p]===actualWinnerSeo(p)).length; }
-function scoreEntry(pk){ return ORDER.filter(p=>pk[p] && pk[p]===actualWinnerSeo(p)).length; }
+/* ---------- scoring (configurable via SCORING) ---------- */
+const POS_ROUND = {}; ROUNDS.forEach(R=>R.positions.forEach(p=>{ POS_ROUND[p]=R.key; }));
+function roundPoints(rk){ return SCORING==='flat' ? 1 : ({1:1,2:2,3:4,4:8}[rk] || 1); }
+function isUpset(pos){
+  const g=BYPOS[pos]; if(!g) return false;
+  const w=g.teams.find(t=>t.isWinner), l=g.teams.find(t=>!t.isWinner);
+  if(!w||!l) return false;
+  return (w.seed?+w.seed:99) > (l.seed?+l.seed:99);   // winner was the lower seed → upset
+}
+function pointsFor(pk){
+  let pts=0;
+  ORDER.forEach(p=>{ if(pk[p] && pk[p]===actualWinnerSeo(p)){ pts += roundPoints(POS_ROUND[p]); if(SCORING==='upset' && isUpset(p)) pts += 1; } });
+  return pts;
+}
+function maxPoints(){ let m=0; ORDER.forEach(p=>m+=roundPoints(POS_ROUND[p])); return m; }
+const MAX_POINTS = maxPoints();
+function scoringLabel(){ return SCORING==='flat' ? '1 pt per pick' : (SCORING==='upset' ? '1·2·4·8 + upset bonus' : 'R16·QF·FF·Final = 1·2·4·8'); }
+function correctOf(pk){ return ORDER.filter(p=>pk[p] && pk[p]===actualWinnerSeo(p)).length; }
+function correctCount(){ return correctOf(picks); }   // # correct (info / messaging)
+function myPoints(){ return pointsFor(picks); }
+function scoreEntry(pk){ return pointsFor(pk); }       // POINTS (leaderboard ranking)
 function roundPicked(R){ const vp = viewPicks(); return R.positions.filter(p=>vp[p]).length; }
 function myEntry(){ return playerName ? poolCache.find(e=>e.name.toLowerCase()===playerName.toLowerCase()) : null; }
 
@@ -848,7 +872,7 @@ async function renderLeaderboard(opts){
           <div class="lbchamp">${grpBadge}🏆 ${logo} ${ct.nameShort} ${tag}</div>
           <div class="lbmini">${rmini}</div>
         </div>
-        <div class="lbscore"><b>${e.correct}</b><span>/15</span></div>
+        <div class="lbscore"><b>${e.correct}</b><span>pts</span></div>
         <div class="lbview">&#10530;</div>
       </div>`;
     }).join('');
@@ -858,8 +882,8 @@ async function renderLeaderboard(opts){
     <button class="lbscope-btn ${global?'on':''}" onclick="setLbScope('global')">Everyone</button>
   </div>`;
   const head = global
-    ? `<div class="lbhead">All players · every group · scored live vs 2026</div>`
-    : `<div class="lbhead">${activeGroup().name} · scored live vs the real 2026 results</div>`;
+    ? `<div class="lbhead">All players · every group &nbsp;·&nbsp; ${scoringLabel()}</div>`
+    : `<div class="lbhead">${activeGroup().name} &nbsp;·&nbsp; ${scoringLabel()}</div>`;
   const devActions = (!global && !REMOTE) ?
     `<div class="lbactions">
        <button class="btn" onclick="addDemoFriends()">➕ Add demo friends</button>
@@ -1242,10 +1266,10 @@ function renderChrome(){
   const chip = document.getElementById('scoreChip');
   const revealBtn = document.getElementById('revealBtn');
   if(revealed){
-    const c = correctCount();
-    chip.innerHTML = `<b>${c}</b>/15 correct`; chip.className = 'scorechip good';
+    const c = correctCount(), pts = myPoints();
+    chip.innerHTML = `<b>${pts}</b> pts`; chip.className = 'scorechip good';
     revealBtn.textContent = '✏️ Back to picks'; revealBtn.disabled = false;
-    document.getElementById('hint').innerHTML = `You scored <b>${c} of 15</b>. ◆ marks games the real winner took from your pick.`;
+    document.getElementById('hint').innerHTML = `You scored <b>${pts} pts</b> (${c}/15 correct) · ${scoringLabel()}. ◆ marks games the real winner took from your pick.`;
     document.getElementById('legend').innerHTML = `<span><i style="color:var(--win)">&#10003;</i> correct</span><span><i style="color:var(--red)">&#10007;</i> wrong</span><span><i style="color:var(--gold)">&#9670;</i> actually won</span>`;
   } else {
     chip.innerHTML = `<b>${made}</b>/15 picked`; chip.className = 'scorechip';
