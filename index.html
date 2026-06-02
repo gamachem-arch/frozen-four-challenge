@@ -160,7 +160,7 @@ body{padding:0 0 90px}
 .pc-grip{width:40px;height:4px;border-radius:2px;background:var(--border);margin:6px auto 14px;cursor:pointer}
 .pc-head{display:flex;gap:14px;align-items:center}
 .pc-shot{width:74px;height:74px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface2);border:2px solid var(--border)}
-.pc-noshot{display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:var(--muted)}
+.pc-noshot{display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;color:#fff;background:linear-gradient(150deg,var(--accent),#1e3a8a);border-color:transparent}
 .pc-id{flex:1;min-width:0}
 .pc-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;line-height:1.05}
 .pc-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--muted);letter-spacing:0.3px;margin-top:2px}
@@ -792,11 +792,14 @@ function renderPlayerCard(){
   const prof = nhlPlayerCache[k];
   const team = teamBySeo(seo);
 
-  // header: headshot (if loaded), name, jersey/pos, college
+  // header: real headshot if one exists (NHL only has photos for players who've played),
+  // otherwise a clean jersey-number / initials avatar
   const loading = prof==='loading';
+  const initials = name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const avatarText = loading ? '…' : (stat && stat.num!=null && stat.num!=='' ? stat.num : initials);
   const photo = (prof && prof!=='loading' && prof.headshot)
-    ? `<img class="pc-shot" src="${prof.headshot}" alt="" onerror="this.style.display='none'">`
-    : `<div class="pc-shot pc-noshot">${loading?'…':'<span>'+(stat&&stat.num!=null?('#'+stat.num):'🏒')+'</span>'}</div>`;
+    ? `<img class="pc-shot" src="${prof.headshot}" alt="" onerror="this.outerHTML='<div class=\\'pc-shot pc-noshot\\'><span>${avatarText}</span></div>'">`
+    : `<div class="pc-shot pc-noshot"><span>${avatarText}</span></div>`;
   const age = (prof && prof!=='loading' && prof.birthDate) ? ageFrom(prof.birthDate) : null;
 
   // bio line
