@@ -764,6 +764,19 @@ function teamNhlPanelHTML(pos, seo){
 
 /* ---------- player card (bottom sheet) ---------- */
 let nhlPlayerCache = {};   // normName -> profile | 'loading' | null
+let rosterPhotos = {};     // seo -> { matchKey: rawImageUrl } | 'loading'
+async function ensureRosterPhotos(seo){
+  if(rosterPhotos[seo]!==undefined || !REMOTE) return;
+  rosterPhotos[seo] = 'loading';
+  try { const r = await fetch(`${APPS_SCRIPT}?action=roster&team=${encodeURIComponent(seo)}`, {cache:"no-store"}); const d = await r.json(); rosterPhotos[seo] = (d&&d.ok)?d.byKey:{}; }
+  catch(e){ rosterPhotos[seo] = {}; }
+}
+function playerPhoto(seo, first, last){       // official college roster headshot → square face crop
+  const m = rosterPhotos[seo]; if(!m || m==='loading') return null;
+  const raw = m[normName(first+' '+last)] || m[normName(last)] || null;
+  if(!raw) return null;
+  return `https://images.sidearmdev.com/crop?url=${encodeURIComponent(raw)}&width=240&height=240&gravity=north&type=webp`;
+}
 function findRosterPlayer(seo, name){
   const r = teamRosters[seo]; if(!r) return null;
   const k = name.toLowerCase().split(' ');
@@ -773,6 +786,7 @@ function ageFrom(bd){ if(!bd) return null; const b=new Date(bd), n=new Date(); l
 async function openPlayerCard(seo, name){
   _pcData = { seo, name };
   renderPlayerCard();   // show immediately with stats/draft we already have
+  ensureRosterPhotos(seo).then(()=>{ if(_pcData && _pcData.seo===seo) renderPlayerCard(); });   // official headshot
   const key = normName(name);
   if(nhlPlayerCache[key]===undefined && REMOTE){
     nhlPlayerCache[key] = 'loading';
@@ -792,14 +806,16 @@ function renderPlayerCard(){
   const prof = nhlPlayerCache[k];
   const team = teamBySeo(seo);
 
-  // header: real headshot if one exists (NHL only has photos for players who've played),
-  // otherwise a clean jersey-number / initials avatar
+  // headshot priority: official college roster photo (covers everyone) → NHL mug (only if real) → jersey avatar
   const loading = prof==='loading';
   const initials = name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-  const avatarText = loading ? '…' : (stat && stat.num!=null && stat.num!=='' ? stat.num : initials);
-  const photo = (prof && prof!=='loading' && prof.headshot)
-    ? `<img class="pc-shot" src="${prof.headshot}" alt="" onerror="this.outerHTML='<div class=\\'pc-shot pc-noshot\\'><span>${avatarText}</span></div>'">`
-    : `<div class="pc-shot pc-noshot"><span>${avatarText}</span></div>`;
+  const avatarText = stat && stat.num!=null && stat.num!=='' ? stat.num : initials;
+  const collegeShot = stat ? playerPhoto(seo, stat.first, stat.last) : null;
+  const shotUrl = collegeShot || (prof && prof!=='loading' && prof.headshot) || null;
+  const avatarHTML = `<div class="pc-shot pc-noshot"><span>${avatarText}</span></div>`;
+  const photo = shotUrl
+    ? `<img class="pc-shot" src="${shotUrl}" alt="" onerror="this.outerHTML='${avatarHTML.replace(/'/g,"\\'")}'">`
+    : avatarHTML;
   const age = (prof && prof!=='loading' && prof.birthDate) ? ageFrom(prof.birthDate) : null;
 
   // bio line
