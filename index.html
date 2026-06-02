@@ -159,7 +159,10 @@ body{padding:0 0 90px}
 @keyframes pcup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .pc-grip{width:40px;height:4px;border-radius:2px;background:var(--border);margin:6px auto 14px;cursor:pointer}
 .pc-head{display:flex;gap:14px;align-items:center}
-.pc-shot{width:74px;height:74px;border-radius:50%;object-fit:cover;flex:none;background:var(--surface2);border:2px solid var(--border)}
+.pc-shot-wrap{position:relative;width:74px;height:74px;flex:none}
+.pc-shot{width:74px;height:74px;border-radius:50%;object-fit:cover;background:var(--surface2);border:2px solid var(--border)}
+.pc-shot-wrap .pc-shot{position:absolute;inset:0}
+.pc-photo{z-index:1}
 .pc-noshot{display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;color:#fff;background:linear-gradient(150deg,var(--accent),#1e3a8a);border-color:transparent}
 .pc-id{flex:1;min-width:0}
 .pc-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;line-height:1.05}
@@ -806,16 +809,17 @@ function renderPlayerCard(){
   const prof = nhlPlayerCache[k];
   const team = teamBySeo(seo);
 
-  // headshot priority: official college roster photo (covers everyone) → NHL mug (only if real) → jersey avatar
+  // headshot priority: official college roster photo (covers everyone) → NHL mug (only if real) → jersey avatar.
+  // layered so a failed photo simply removes itself, revealing the avatar beneath (no HTML-in-onerror hacks)
   const loading = prof==='loading';
   const initials = name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const avatarText = stat && stat.num!=null && stat.num!=='' ? stat.num : initials;
   const collegeShot = stat ? playerPhoto(seo, stat.first, stat.last) : null;
   const shotUrl = collegeShot || (prof && prof!=='loading' && prof.headshot) || null;
-  const avatarHTML = `<div class="pc-shot pc-noshot"><span>${avatarText}</span></div>`;
-  const photo = shotUrl
-    ? `<img class="pc-shot" src="${shotUrl}" alt="" onerror="this.outerHTML='${avatarHTML.replace(/'/g,"\\'")}'">`
-    : avatarHTML;
+  const photo = `<div class="pc-shot-wrap">
+    <div class="pc-shot pc-noshot"><span>${avatarText}</span></div>
+    ${shotUrl ? `<img class="pc-shot pc-photo" src="${shotUrl}" alt="" onerror="this.remove()">` : ''}
+  </div>`;
   const age = (prof && prof!=='loading' && prof.birthDate) ? ageFrom(prof.birthDate) : null;
 
   // bio line
@@ -851,7 +855,7 @@ function renderPlayerCard(){
       ${photo}
       <div class="pc-id">
         <div class="pc-name">${name}</div>
-        <div class="pc-sub">${stat&&stat.num!=null?'#'+stat.num+' · ':''}${(stat&&stat.pos)||draft&&draft.pos||''} · ${team.nameShort}</div>
+        <div class="pc-sub">${stat&&stat.num!=null?'#'+stat.num+' · ':''}${(draft&&draft.pos)||(prospect&&prospect.pos)||(prof&&prof!=='loading'&&prof.pos)||(stat&&stat.pos)||''} · ${team.nameShort}</div>
         ${bio}
       </div>
     </div>
