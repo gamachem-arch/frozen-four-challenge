@@ -33,7 +33,11 @@ body{padding:0 0 90px}
 .apptop{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .nav{display:flex;margin-top:11px}
 .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;width:100%}
-.tab{flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.3px;padding:8px 6px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.3px;padding:6px 4px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;position:relative}
+.tab .tic{font-size:15px;line-height:1}
+.tab .tlb{font-size:12px;line-height:1}
+.tab .tct{position:absolute;top:3px;right:50%;transform:translateX(20px);min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;line-height:15px;text-align:center}
+.tab.on .tct{background:#fff;color:var(--accent)}
 .tab.on{background:var(--accent);color:#fff}
 .who{flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
 .groupchip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;cursor:pointer;white-space:nowrap;overflow:hidden}
@@ -1541,10 +1545,10 @@ function renderNav(){
   const n = poolCache.length;
   document.getElementById('nav').innerHTML = `
     <div class="tabs">
-      <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')">Bracket</button>
-      <button class="tab ${currentView==='live'?'on':''}" onclick="go('live')">Live</button>
-      <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')">Board${n?` · ${n}`:''}</button>
-      <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')">Confs</button>
+      <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')"><span class="tic">🏒</span><span class="tlb">Bracket</span></button>
+      <button class="tab ${currentView==='live'?'on':''}" onclick="go('live')"><span class="tic">📺</span><span class="tlb">Live</span></button>
+      <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')"><span class="tic">🏆</span><span class="tlb">Leaderboard</span>${n?`<span class="tct">${n}</span>`:''}</button>
+      <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')"><span class="tic">🎟️</span><span class="tlb">Conferences</span></button>
     </div>`;
   const w = document.getElementById('whoBtn');
   if(w) w.textContent = playerName ? '👤 '+playerName : '👤 Set name';
