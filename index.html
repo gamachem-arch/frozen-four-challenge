@@ -233,6 +233,20 @@ body{padding:0 0 90px}
 .grpbadge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:2px 7px;border-radius:10px;vertical-align:middle}
 
 /* ---------- live game cards ---------- */
+.lgdate{display:flex;align-items:center;gap:8px;padding:2px 14px 10px}
+.lgd-arrow{flex:0 0 auto;width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:20px;line-height:1;cursor:pointer}
+.lgd-arrow:active{background:var(--surface2)}
+.lgd-mid{position:relative;flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);cursor:pointer}
+.lgd-lab{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.4px;text-transform:uppercase;color:var(--text);line-height:1.1}
+.lgd-sub{font-size:10px;color:var(--muted);line-height:1.3;min-height:12px}
+.lgd-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;padding:0;margin:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.lg-err{font-size:12px;color:var(--loss);margin:8px 0 2px;word-break:break-word}
+.lg-retry{margin-top:12px;padding:8px 18px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--accent);font-size:13px;cursor:pointer}
+.lgd-today{text-align:center;margin:-4px 0 10px}
+.lgd-today button{border:0;background:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px 8px}
+.lg-rank{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;color:var(--accent);margin-right:4px;vertical-align:1px}
+.lg-more{margin-top:9px;padding-top:9px;border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--accent);cursor:pointer;user-select:none}
+.lg-more.dim{color:var(--muted);cursor:default}
 .lgwrap{padding:0 14px}
 .lgcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:12px}
 .lgcard.islive{border-color:rgba(239,68,68,0.45);box-shadow:0 0 0 1px rgba(239,68,68,0.15)}
@@ -244,12 +258,13 @@ body{padding:0 0 90px}
 .lg-fin{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.5px;color:var(--muted);background:var(--surface2);padding:3px 9px;border-radius:12px}
 .lg-pre{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;color:var(--accent)}
 .lg-score{display:flex;align-items:center;gap:8px}
-.lg-team{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.lg-team{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.lg-team.home .lg-tn{text-align:right}
 .lg-team.home{flex-direction:row-reverse}
-.lg-team img{width:34px;height:34px;object-fit:contain;flex:none}
-.lg-tn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.lg-team img{width:30px;height:30px;object-fit:contain;flex:none}
+.lg-tn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;flex:1;min-width:0;line-height:1.06;overflow-wrap:break-word;color:var(--muted)}
 .lg-team.win .lg-tn{color:var(--text);font-weight:800}
-.lg-pts{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;line-height:1;color:var(--muted);flex:none}
+.lg-pts{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;line-height:1;color:var(--muted);flex:none}
 .lg-team.win .lg-pts{color:var(--text)}
 .lg-at{font-size:11px;color:var(--loss);font-weight:700;flex:none}
 .lg-bars{margin-top:12px;display:flex;flex-direction:column;gap:8px}
@@ -522,8 +537,12 @@ let expandedConfs = {};
 let _ovPicks = null, _ovTitle = "", _ovMode = "picks", _lbScored = [];
 let mobileViewAll = false;
 let editingUnlocked = false;   // re-enable editing of an already-submitted bracket
-const LIVE_DEMO_DATE = "2026/03/27";   // off-season fallback (a real tourney day); production uses today
-let liveGames = [];            // scoreboard game objects (tournament only)
+let liveDate = todayYMD();     // YYYY/MM/DD the Live tab is showing
+let liveFetchedFor = null;     // date we last successfully fetched (avoids refetch on tab switch)
+let liveOpen = {};             // gameID -> true when a final game's stats are expanded
+let liveError = null;          // non-null when the last fetch failed (vs. a genuinely empty day)
+let livePollT = null;          // auto-refresh interval handle
+let liveGames = [];            // scoreboard game objects for liveDate (ALL D-I games)
 let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore ('loading'|null|obj)
 let liveLoading = false;
 let expandedGames = {};        // bracket pos -> inline box score expanded?
@@ -1316,13 +1335,26 @@ async function handleGroupHash(){
 }
 
 /* ---------- live games (inline cards) ---------- */
+/* Throws on failure so the UI can tell "request died" apart from "no games that day" —
+   returning [] for both used to render an outage as a real, empty schedule. */
 async function apiScoreboard(date){
   if(!REMOTE) return [];
-  try {
-    const u = `${APPS_SCRIPT}?action=ncaaScoreboard${date?`&date=${encodeURIComponent(date)}`:''}`;
-    const r = await fetch(u, {cache:"no-store"}); const d = await r.json();
-    return (d.games||[]).map(x=>x.game).filter(g=>g && g.championshipId);   // tournament games only
-  } catch(e){ return []; }
+  const u = `${APPS_SCRIPT}?action=ncaaScoreboard${date?`&date=${encodeURIComponent(date)}`:''}`;
+  let last;
+  // Apps Script intermittently answers /exec with a 404 HTML page under load, so retry once
+  // before giving up. An empty-but-valid day is NOT an error and returns immediately.
+  for(let attempt = 0; attempt < 2; attempt++){
+    if(attempt) await new Promise(r=>setTimeout(r, 900));
+    try {
+      const r = await fetch(u, {cache:"no-store"});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      if(d && d.ok === false) throw new Error(d.error || 'proxy error');
+      if(!d || !Array.isArray(d.games)) throw new Error('unexpected response');
+      return d.games.map(x=>x.game).filter(Boolean);   // every D-I game that day
+    } catch(e){ last = e; }
+  }
+  throw last;
 }
 async function apiGame(id){
   if(!REMOTE) return null;
@@ -1362,32 +1394,108 @@ function liveLogo(seo){
   if(TEAMS[seo] && TEAMS[seo].logoUrl) return NCAA_IMG + TEAMS[seo].logoUrl;
   return `${NCAA_IMG}/sites/default/files/images/logos/schools/${(seo||'x')[0]}/${seo}.70.png`;
 }
+/* --- date helpers --- */
+function ymd(d){ return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
+function todayYMD(){ return ymd(new Date()); }
+function parseYMD(s){ const p=String(s).split('/').map(Number); return new Date(p[0], p[1]-1, p[2]); }
+function fmtLiveDate(s){
+  return parseYMD(s).toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'});
+}
+function offSeason(s){ const m = parseYMD(s).getMonth(); return m>=4 && m<=8; }   // May–Sep
+
+async function goLiveDate(d){
+  if(!d) return;
+  liveDate = d; liveGames = []; liveBox = {}; liveOpen = {}; liveFetchedFor = null; liveError = null;
+  liveLoading = true; paintLive();
+  await refreshLive();
+}
+function shiftLiveDate(n){ const d = parseYMD(liveDate); d.setDate(d.getDate()+n); goLiveDate(ymd(d)); }
+
+/* Only LIVE games auto-load a boxscore — a regular-season Saturday can have 25+ games and
+   fetching every one would hammer the 5 req/sec proxy limit. Finals load on tap. */
 async function refreshLive(){
-  let games = await apiScoreboard(null);              // today's tournament games
-  if(!games.length) games = await apiScoreboard(LIVE_DEMO_DATE);   // off-season demo fallback
+  const forDate = liveDate;
+  let games;
+  try { games = await apiScoreboard(forDate); }
+  catch(e){
+    if(forDate !== liveDate) return;
+    liveError = e.message || 'request failed';
+    liveLoading = false; paintLive(); return;
+  }
+  if(forDate !== liveDate) return;                  // user moved on — drop the stale response
+  liveError = null;
   liveGames = games;
+  liveFetchedFor = forDate;
+  liveLoading = false;
   paintLive();
   for(const g of games){
-    const st = String(g.gameState||'').toLowerCase();
-    if(st==='final' || st==='live'){
-      const b = await apiGame(g.gameID);
-      liveBox[g.gameID] = boxStats(b);
-      if(currentView==='live') paintLive();
-    }
+    if(String(g.gameState||'').toLowerCase() !== 'live') continue;
+    const b = await apiGame(g.gameID);
+    if(forDate !== liveDate) return;
+    liveBox[g.gameID] = boxStats(b);
+    paintLive();
   }
 }
-async function renderLive(){
+async function toggleLiveStats(id){
+  if(liveOpen[id]){ liveOpen[id] = false; paintLive(); return; }
+  liveOpen[id] = true;
+  if(liveBox[id] === undefined){
+    liveBox[id] = 'loading'; paintLive();
+    const b = await apiGame(id);
+    liveBox[id] = boxStats(b);
+  }
   paintLive();
-  if(!liveLoading && !liveGames.length){ liveLoading = true; await refreshLive(); liveLoading = false; }
+}
+function retryLive(){ liveError = null; liveFetchedFor = null; liveLoading = true; paintLive(); refreshLive(); }
+function startLivePoll(){
+  stopLivePoll();
+  livePollT = setInterval(()=>{
+    if(currentView !== 'live'){ stopLivePoll(); return; }
+    if(liveDate !== todayYMD()) return;                                       // only poll today
+    if(!liveGames.some(g=>String(g.gameState||'').toLowerCase()==='live')) return;
+    refreshLive();
+  }, 30000);
+}
+function stopLivePoll(){ if(livePollT){ clearInterval(livePollT); livePollT = null; } }
+
+async function renderLive(){
+  startLivePoll();
+  if(liveFetchedFor === liveDate || liveLoading){ paintLive(); return; }
+  liveLoading = true; paintLive();
+  await refreshLive();
+}
+function liveDateNavHtml(){
+  const isToday = liveDate === todayYMD();
+  const label = fmtLiveDate(liveDate);
+  return `<div class="lgdate">
+      <button class="lgd-arrow" onclick="shiftLiveDate(-1)" aria-label="Previous day">&#8249;</button>
+      <label class="lgd-mid">
+        <span class="lgd-lab">${isToday ? 'Today' : label}</span>
+        <span class="lgd-sub">${isToday ? label : (liveGames.length ? liveGames.length+' games' : '')}</span>
+        <input type="date" class="lgd-input" value="${liveDate.replace(/\//g,'-')}"
+               onchange="goLiveDate(this.value.replace(/-/g,'/'))">
+      </label>
+      <button class="lgd-arrow" onclick="shiftLiveDate(1)" aria-label="Next day">&#8250;</button>
+    </div>
+    ${isToday ? '' : `<div class="lgd-today"><button onclick="goLiveDate(todayYMD())">&#8635; Jump to today</button></div>`}`;
 }
 function paintLive(){
   if(currentView!=='live') return;
   const mount = document.getElementById('mount');
+  const nav = liveDateNavHtml();
   if(!liveGames.length){
-    mount.innerHTML = `<div class="lbhead">Live Games</div><div class="empty">${liveLoading?'Loading games…':'No tournament games right now.<br>This fills with live scores &amp; stats once games are on.'}</div>`;
+    let msg;
+    if(liveLoading) msg = 'Loading games&hellip;';
+    else if(liveError) msg = `Couldn't reach the scoreboard.<div class="lg-err">${liveError}</div>`
+      + `<button class="lg-retry" onclick="retryLive()">Try again</button>`;
+    else msg = `No D-I games on ${fmtLiveDate(liveDate)}.`
+      + (offSeason(liveDate) ? '<br>The season runs October through April.' : '');
+    mount.innerHTML = `${nav}<div class="empty">${msg}</div>`;
     return;
   }
-  mount.innerHTML = `<div class="lbhead">Live Games · scores &amp; stats update automatically</div><div class="lgwrap">${liveGames.map(liveGameCard).join('')}</div>`;
+  const live = liveGames.filter(g=>String(g.gameState||'').toLowerCase()==='live').length;
+  const head = live ? `<b>${live} game${live>1?'s':''} live</b> &middot; updating every 30s` : 'Scores &amp; stats';
+  mount.innerHTML = `${nav}<div class="lbhead">${head}</div><div class="lgwrap">${liveGames.map(liveGameCard).join('')}</div>`;
 }
 function liveGameCard(g){
   const a=g.away, h=g.home, aSeo=a.names.seo, hSeo=h.names.seo;
@@ -1398,18 +1506,52 @@ function liveGameCard(g){
   if(st==='live') status = `<span class="lg-live"><span class="lg-dot"></span>LIVE · ${g.currentPeriod||''} ${g.contestClock||''}</span>`;
   else if(st==='final') status = `<span class="lg-fin">FINAL</span>`;
   else status = `<span class="lg-pre">${g.startTime||'TBD'}</span>`;
-  const round = (g.championshipGame && g.championshipGame.round && g.championshipGame.round.title) || 'Tournament';
+  const round = liveGameLabel(g);
   const stats = liveBox[g.gameID];
-  const bars = (st!=='pre' && stats) ? liveStatBars(stats[aSeo], stats[hSeo]) : '';
-  const goals = (st!=='pre' && stats) ? liveGoals(stats[aSeo], stats[hSeo], a.names.short, h.names.short) : '';
+  const loaded = stats && stats !== 'loading';
+  // live games pull their boxscore automatically; finals expand on tap
+  const show = st==='live' || (st==='final' && liveOpen[g.gameID]);
+  const bars = (show && loaded) ? liveStatBars(stats[aSeo], stats[hSeo]) : '';
+  const goals = (show && loaded) ? liveGoals(stats[aSeo], stats[hSeo], teamName(a), teamName(h)) : '';
+  let more = '';
+  if(st==='final'){
+    more = liveOpen[g.gameID]
+      ? (stats === 'loading' ? '<div class="lg-more">loading stats&hellip;</div>'
+         : (loaded ? `<div class="lg-more" onclick="toggleLiveStats('${g.gameID}')">&#9662; hide stats</div>`
+                   : '<div class="lg-more dim">no stats available</div>'))
+      : `<div class="lg-more" onclick="toggleLiveStats('${g.gameID}')">&#9656; stats &amp; scoring</div>`;
+  }
   const tm = (t,seo,sc,win,home)=>`<div class="lg-team ${home?'home':''} ${win?'win':''}">
     <img src="${liveLogo(seo)}" alt="" onerror="this.style.visibility='hidden'">
-    <span class="lg-tn">${t.names.short}</span><span class="lg-pts">${sc}</span></div>`;
+    <span class="lg-tn">${t.rank?`<span class="lg-rank">#${t.rank}</span>`:''}${teamName(t)}</span><span class="lg-pts">${sc}</span></div>`;
   return `<div class="lgcard ${st==='live'?'islive':''}">
     <div class="lg-head"><span class="lg-round">${round}</span>${status}</div>
     <div class="lg-score">${tm(a,aSeo,aSc,aWin,false)}<span class="lg-at">@</span>${tm(h,hSeo,hSc,hWin,true)}</div>
-    ${bars}${goals}
+    ${bars}${goals}${more}
   </div>`;
+}
+/* NCAA tags each side with a conferenceSeo but leaves conferenceName blank, so map it here. */
+const CONF_NAMES = {
+  'big-ten':'Big Ten', 'nchc':'NCHC', 'ccha':'CCHA',
+  "hockey-east (men's)":'Hockey East', "ecac-hockey (men's)":'ECAC Hockey',
+  'aha-(men)':'Atlantic Hockey', 'di-independent':'Independent'
+};
+/* The feed leaves Mercyhurst's conference blank on every game — patch known gaps by seo. */
+const CONF_FIX = { 'mercyhurst':'aha-(men)' };
+const NAME_FIX = { 'massachusetts':'UMass' };
+function teamName(t){ return NAME_FIX[t.names && t.names.seo] || t.names.short; }
+function confOf(t){
+  const c = (t.conferences||[])[0];
+  return (c && c.conferenceSeo) || CONF_FIX[t.names && t.names.seo] || '';
+}
+function liveGameLabel(g){
+  const t = (g.championshipGame && g.championshipGame.round && g.championshipGame.round.title) || '';
+  if(t) return t;
+  if(g.bracketRound) return g.bracketRound;
+  const as = confOf(g.away), hs = confOf(g.home);
+  if(!as || !hs) return '';                    // unknown — don't claim non-conference
+  if(as === hs) return CONF_NAMES[as] || as;
+  return 'Non-conference';
 }
 function liveStatBars(a,h){
   if(!a || !h) return '';
@@ -1584,7 +1726,7 @@ function render(){
 }
 
 /* ---------- actions ---------- */
-function go(view){ currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+function go(view){ if(view!=='live') stopLivePoll(); currentView = view; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function goRound(n){ mobileRound = Math.max(1,Math.min(4,n)); render(); window.scrollTo({top:0,behavior:'smooth'}); }
 function setName(){
   const n = prompt("Your name for the pool:", playerName || "");
