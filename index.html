@@ -33,9 +33,9 @@ body{padding:0 0 90px}
 .apptop{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .nav{display:flex;margin-top:11px}
 .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;width:100%}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.3px;padding:6px 4px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;position:relative}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.2px;padding:6px 2px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;position:relative}
 .tab .tic{font-size:15px;line-height:1}
-.tab .tlb{font-size:12px;line-height:1}
+.tab .tlb{font-size:11px;line-height:1}
 .tab .tct{position:absolute;top:3px;right:50%;transform:translateX(20px);min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;line-height:15px;text-align:center}
 .tab.on .tct{background:#fff;color:var(--accent)}
 .tab.on{background:var(--accent);color:#fff}
@@ -233,6 +233,25 @@ body{padding:0 0 90px}
 .grpbadge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:2px 7px;border-radius:10px;vertical-align:middle}
 
 /* ---------- live game cards ---------- */
+.rkseg{display:flex;gap:4px;padding:0 14px 12px}
+.rkseg-b{flex:1;padding:7px 4px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.rkseg-b.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rkwrap{padding:0 14px}
+.rkrow{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid var(--border)}
+.rkrow.in .rk-no{color:var(--accent)}
+.rk-no{flex:0 0 26px;text-align:right;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;color:var(--muted)}
+.rk-logo{width:24px;height:24px;object-fit:contain;flex:none}
+.rk-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.rk-school{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:var(--text);line-height:1.1;overflow-wrap:break-word}
+.rk-meta{font-size:10px;color:var(--muted);line-height:1.2}
+.rk-npi{flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}
+.rkcut{display:flex;align-items:center;gap:8px;margin:10px 0 4px;color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.rkcut::before,.rkcut::after{content:"";flex:1;height:1px;background:var(--accent);opacity:.5}
+.rknote{font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 12px}
+.rkconf{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:16px 0 2px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--text)}
+.rkconf-n{font-family:Inter,sans-serif;font-weight:400;font-size:10px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.rk-sub{color:var(--muted)}
+.rkrow.in .rk-sub{color:var(--accent)}
 .lgdate{display:flex;align-items:center;gap:8px;padding:2px 14px 10px}
 .lgd-arrow{flex:0 0 auto;width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:20px;line-height:1;cursor:pointer}
 .lgd-arrow:active{background:var(--surface2)}
@@ -541,6 +560,9 @@ let liveDate = todayYMD();     // YYYY/MM/DD the Live tab is showing
 let liveFetchedFor = null;     // date we last successfully fetched (avoids refetch on tab switch)
 let liveOpen = {};             // gameID -> true when a final game's stats are expanded
 let liveError = null;          // non-null when the last fetch failed (vs. a genuinely empty day)
+let rankData = null;           // {title,updated,data:[...]} from the NPI feed
+let rankLoading = false, rankError = null;
+let rankView = 'national';     // 'national' | 'conf' | 'bubble' 
 let livePollT = null;          // auto-refresh interval handle
 let liveGames = [];            // scoreboard game objects for liveDate (ALL D-I games)
 let liveBox = {};              // gameID -> { seoname: teamStats } from boxscore ('loading'|null|obj)
@@ -1573,6 +1595,105 @@ function liveGoals(a,h,aName,hName){
   return `<div class="lg-goals"><div class="lg-goalcol"><div class="lg-gt">${aName}</div>${list(a)}</div><div class="lg-goalcol home"><div class="lg-gt">${hName}</div>${list(h)}</div></div>`;
 }
 
+/* ---------- rankings (NPI) ---------- */
+/* NPI is what the NCAA actually seeds on — the PairWise successor. The feed carries
+   Record and Conf on every row, so one fetch backs all three views below. */
+const TOURNEY_FIELD = 16;      // teams in the NCAA tournament
+/* Rankings rows give a school name but no seo/logo, and slugifying is wrong for these six. */
+const SEO_FIX = { 'Army West Point':'army', 'LIU':'long-island', 'Lindenwood':'lindenwood-mo',
+                  'Minnesota St.':'minn-st-mankato', 'Omaha':'neb-omaha', 'RIT':'rochester-inst' };
+function rankSeo(school){
+  return SEO_FIX[school] || String(school).toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+}
+async function apiRankings(){
+  if(!REMOTE) return null;
+  const u = `${APPS_SCRIPT}?action=ncaaRankings`;
+  let last;
+  for(let attempt = 0; attempt < 2; attempt++){
+    if(attempt) await new Promise(r=>setTimeout(r, 900));
+    try {
+      const r = await fetch(u, {cache:"no-store"});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      if(d && d.ok === false) throw new Error(d.error || 'proxy error');
+      if(!d || !Array.isArray(d.data) || !d.data.length) throw new Error('unexpected response');
+      return d;
+    } catch(e){ last = e; }
+  }
+  throw last;
+}
+async function renderRankings(){
+  paintRankings();
+  if(rankData || rankLoading) return;
+  rankLoading = true; rankError = null; paintRankings();
+  try { rankData = await apiRankings(); }
+  catch(e){ rankError = e.message || 'request failed'; }
+  rankLoading = false;
+  paintRankings();
+}
+function retryRankings(){ rankData = null; rankError = null; renderRankings(); }
+function setRankView(v){ rankView = v; paintRankings(); }
+
+function rankRow(r, opts){
+  opts = opts || {};
+  const seo = rankSeo(r.School);
+  const inField = (+r.Rank) <= TOURNEY_FIELD;
+  return `<div class="rkrow ${inField?'in':''}">
+    <span class="rk-no">${opts.subRank ? `<span class="rk-sub">${opts.subRank}</span>` : r.Rank}</span>
+    <img class="rk-logo" src="${liveLogo(seo)}" alt="" onerror="this.style.visibility='hidden'">
+    <span class="rk-main">
+      <span class="rk-school">${NAME_FIX[seo] || r.School}</span>
+      <span class="rk-meta">${opts.subRank ? '#'+r.Rank+' overall' : r.Conf} &middot; ${r.Record}</span>
+    </span>
+    <span class="rk-npi">${r.NPI}</span>
+  </div>`;
+}
+function rankCutLine(){
+  return `<div class="rkcut"><span>${TOURNEY_FIELD}-team field</span></div>
+    <div class="rknote">Auto-bids go to the six conference champions, so a champion finishing below this
+      line takes an at-large spot with it.</div>`;
+}
+function paintRankings(){
+  if(currentView !== 'rankings') return;
+  const mount = document.getElementById('mount');
+  const seg = `<div class="rkseg">
+      ${[['national','National'],['conf','By conference'],['bubble','Bubble']]
+        .map(([k,l])=>`<button class="rkseg-b ${rankView===k?'on':''}" onclick="setRankView('${k}')">${l}</button>`).join('')}
+    </div>`;
+  if(!rankData){
+    let msg;
+    if(rankLoading) msg = 'Loading rankings&hellip;';
+    else if(rankError) msg = `Couldn't load the NPI rankings.<div class="lg-err">${rankError}</div>`
+      + `<button class="lg-retry" onclick="retryRankings()">Try again</button>`;
+    else msg = 'No rankings available.';
+    mount.innerHTML = `${seg}<div class="empty">${msg}</div>`;
+    return;
+  }
+  const rows = rankData.data;
+  const sub = `<div class="lbhead">NPI &middot; ${rankData.updated || ''}</div>`;
+  let body = '';
+  if(rankView === 'national'){
+    body = rows.map(r => rankRow(r) + ((+r.Rank) === TOURNEY_FIELD ? rankCutLine() : '')).join('');
+  } else if(rankView === 'conf'){
+    const by = {};
+    rows.forEach(r=>{ (by[r.Conf] = by[r.Conf] || []).push(r); });
+    // strongest conference first, measured by its best team
+    const order = Object.keys(by).sort((a,b)=> (+by[a][0].Rank) - (+by[b][0].Rank));
+    body = order.map(c=>{
+      const n = by[c].filter(r=>(+r.Rank)<=TOURNEY_FIELD).length;
+      return `<div class="rkconf"><span>${c}</span><span class="rkconf-n">${by[c].length} teams${n?` &middot; ${n} in the field`:''}</span></div>`
+        + by[c].map((r,i)=>rankRow(r,{subRank:i+1})).join('');
+    }).join('');
+  } else {
+    const lo = Math.max(1, TOURNEY_FIELD - 6), hi = TOURNEY_FIELD + 8;
+    const band = rows.filter(r=>(+r.Rank) >= lo && (+r.Rank) <= hi);
+    body = `<div class="rknote" style="margin:0 0 10px">Ranks ${lo}&ndash;${hi} — the teams either side of the cut.</div>`
+      + band.map(r => rankRow(r) + ((+r.Rank) === TOURNEY_FIELD ? rankCutLine() : '')).join('');
+  }
+  mount.innerHTML = `${seg}${sub}<div class="rkwrap">${body}</div>`;
+}
+
 /* ---------- conferences view ---------- */
 function toggleConf(k){ expandedConfs[k] = !expandedConfs[k]; renderConferences(); }
 function fmtMD(d){ const mo={"01":"Jan","02":"Feb","03":"Mar","04":"Apr"}; const p=d.split("/"); return (mo[p[0]]||p[0])+" "+parseInt(p[1],10); }
@@ -1690,6 +1811,7 @@ function renderNav(){
       <button class="tab ${currentView==='bracket'?'on':''}" onclick="go('bracket')"><span class="tic">🏒</span><span class="tlb">Bracket</span></button>
       <button class="tab ${currentView==='live'?'on':''}" onclick="go('live')"><span class="tic">📺</span><span class="tlb">Live</span></button>
       <button class="tab ${currentView==='leaderboard'?'on':''}" onclick="go('leaderboard')"><span class="tic">🏆</span><span class="tlb">Leaderboard</span>${n?`<span class="tct">${n}</span>`:''}</button>
+      <button class="tab ${currentView==='rankings'?'on':''}" onclick="go('rankings')"><span class="tic">📊</span><span class="tlb">Rankings</span></button>
       <button class="tab ${currentView==='conferences'?'on':''}" onclick="go('conferences')"><span class="tic">🎟️</span><span class="tlb">Conferences</span></button>
     </div>`;
   const w = document.getElementById('whoBtn');
@@ -1713,6 +1835,10 @@ function render(){
     bc.style.display = 'none';
     document.getElementById('legend').innerHTML = '';
     renderConferences();
+  } else if(currentView==='rankings'){
+    bc.style.display = 'none';
+    document.getElementById('legend').innerHTML = '';
+    renderRankings();
   } else if(currentView==='live'){
     bc.style.display = 'none';
     document.getElementById('legend').innerHTML = '';
